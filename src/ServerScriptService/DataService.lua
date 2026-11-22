@@ -19,6 +19,7 @@ local function defaultData(Config)
 		Money = Config.StartMoney,
 		Terminal = 0,        -- накоплено на терминале (нужно забрать)
 		Purchases = {},      -- upgradeId -> true
+		ShopItems = {},      -- cosmeticId -> true
 	}
 end
 

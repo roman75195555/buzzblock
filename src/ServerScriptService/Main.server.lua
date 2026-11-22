@@ -30,6 +30,11 @@ local Remotes = {
 	GetState     = remoteFunction("GetState"),
 	Notify       = remoteEvent("Notify"),
 	StateChanged = remoteEvent("StateChanged"),
+	WorkBegin    = remoteEvent("WorkBegin"),    -- сервер -> клиент: начать обработку (stone)
+	WorkStage    = remoteEvent("WorkStage"),    -- сервер -> клиент: (stone, stage) 0=стоп/аборт
+	WorkTick     = remoteEvent("WorkTick"),     -- клиент -> сервер: (stone, dt)
+	OpenShop     = remoteEvent("OpenShop"),     -- сервер -> клиент: открыть магазин
+	BuyShopItem  = remoteEvent("BuyShopItem"),  -- клиент -> сервер: (itemId)
 	Folder       = remotes,
 }
 remotes.Parent = ReplicatedStorage
