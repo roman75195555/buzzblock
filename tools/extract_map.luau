@@ -18,7 +18,7 @@ local keepTop = {
 
 local moved = 0
 for _, child in ws:GetChildren() do
-	local keep = keepTop[child.Name] or child:IsA("BasePart")
+	local keep = (keepTop[child.Name] or child:IsA("BasePart")) and child.ClassName ~= "Terrain"
 	if keep and child.Name ~= "Camera" then
 		child.Parent = map
 		moved += 1
