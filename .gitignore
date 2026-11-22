@@ -14,3 +14,7 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+
+# Game assets (extracted from reference map)
+!assets/
+!assets/*.rbxm
