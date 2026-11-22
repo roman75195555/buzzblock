@@ -27,6 +27,7 @@ local function apply(p: BasePart, opts: PartOpts?)
 		if opts.Transparency then p.Transparency = opts.Transparency end
 		if opts.CanCollide ~= nil then p.CanCollide = opts.CanCollide end
 		if opts.Name then p.Name = opts.Name end
+		if opts.Shape and p:IsA("Part") then p.Shape = opts.Shape end
 	end
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
