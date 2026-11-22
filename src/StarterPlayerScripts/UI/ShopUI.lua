@@ -1,220 +1,220 @@
 --!strict
 --==============================================================================
--- BuzzBlocks :: ShopUI (клиент)
--- Магазин деталей: вкладки категорий, карточки товаров, покупка.
+-- SeedRush :: ShopUI
+-- Магазин: улучшения дорожки, тренажёра силы, следы (+скорость).
 --==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local player = Players.LocalPlayer
 local Config = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Config"))
 
 local ShopUI = {}
+local ctx
+local state: any = nil
+local frame: Frame? = nil
+local listFrame: Frame? = nil
 
-local function corner(inst: GuiObject, r: number?)
+local function fmt(n: number): string
+	if n >= 1e6 then
+		return string.format("%.1fM", n / 1e6)
+	elseif n >= 1e3 then
+		return string.format("%.1fK", n / 1e3)
+	end
+	return tostring(math.floor(n))
+end
+
+local function buy(kind: string)
+	local remotes = ReplicatedStorage:WaitForChild("RushRemotes")
+	remotes.BuyUpgrade:FireServer(kind)
+end
+
+local function itemRow(parent: Instance, order: number, title: string, desc: string, btnText: string, btnColor: Color3, kind: string?, enabled: boolean)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -16, 0, 64)
+	row.BackgroundColor3 = Color3.fromRGB(30, 33, 44)
+	row.BorderSizePixel = 0
+	row.LayoutOrder = order
+	row.Parent = parent
 	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r or 10)
-	c.Parent = inst
-	return c
+	c.CornerRadius = UDim.new(0, 10)
+	c.Parent = row
+
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.new(1, -150, 0, 30)
+	t.Position = UDim2.new(0, 12, 0, 4)
+	t.BackgroundTransparency = 1
+	t.Text = title
+	t.Font = Enum.Font.FredokaOne
+	t.TextSize = 18
+	t.TextColor3 = Color3.new(1, 1, 1)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	t.Parent = row
+
+	local d = Instance.new("TextLabel")
+	d.Size = UDim2.new(1, -150, 0, 24)
+	d.Position = UDim2.new(0, 12, 0, 34)
+	d.BackgroundTransparency = 1
+	d.Text = desc
+	d.Font = Enum.Font.Gotham
+	d.TextSize = 14
+	d.TextColor3 = Color3.fromRGB(170, 175, 190)
+	d.TextXAlignment = Enum.TextXAlignment.Left
+	d.Parent = row
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 120, 0, 42)
+	btn.Position = UDim2.new(1, -130, 0.5, -21)
+	btn.BackgroundColor3 = if enabled then btnColor else Color3.fromRGB(70, 72, 80)
+	btn.Text = btnText
+	btn.Font = Enum.Font.FredokaOne
+	btn.TextSize = 17
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.AutoButtonColor = enabled
+	btn.Parent = row
+	local bc = Instance.new("UICorner")
+	bc.CornerRadius = UDim.new(0, 10)
+	bc.Parent = btn
+	if enabled and kind then
+		btn.MouseButton1Click:Connect(function()
+			buy(kind)
+		end)
+	end
 end
 
-local function statText(category: string, part): string
-	if category == "Hull" then return "Прочность: " .. part.HP end
-	if category == "Engine" then return "Скорость: " .. part.Speed end
-	if category == "Propeller" then return "Ускорение: ×" .. part.Boost end
-	if category == "Tank" then return "Топливо: " .. part.Fuel end
-	if category == "Wheel" then return "Поворот: ×" .. part.Turn end
-	return ""
+local function rebuild()
+	if not listFrame then return end
+	for _, ch in ipairs(listFrame:GetChildren()) do
+		if ch:IsA("Frame") then
+			ch:Destroy()
+		end
+	end
+	if not state then return end
+
+	local order = 0
+	-- Дорожка
+	order += 1
+	local tTier = state.TreadmillTier
+	if tTier < Config.MaxTier then
+		local cost = Config.UpgradeCost(tTier)
+		itemRow(listFrame, order,
+			string.format("🏃 Беговая дорожка · ур. %d → %d", tTier, tTier + 1),
+			string.format("Скорость прокачки: %.1f → %.1f ⚡/с", Config.SpeedRate(tTier), Config.SpeedRate(tTier + 1)),
+			fmt(cost) .. " 💰", Color3.fromRGB(70, 160, 255), "treadmill", state.Money >= cost)
+	else
+		itemRow(listFrame, order, "🏃 Беговая дорожка · МАКС", "Скорость прокачки: " .. Config.SpeedRate(tTier) .. " ⚡/с", "MAX", Color3.fromRGB(70, 72, 80), nil, false)
+	end
+
+	-- Тренажёр
+	order += 1
+	local sTier = state.TrainerTier
+	if sTier < Config.MaxTier then
+		local cost = Config.UpgradeCost(sTier)
+		itemRow(listFrame, order,
+			string.format("🏋️ Тренажёр силы · ур. %d → %d", sTier, sTier + 1),
+			string.format("Сила за подъём: %d → %d 💪", Config.StrengthPerRep(sTier), Config.StrengthPerRep(sTier + 1)),
+			fmt(cost) .. " 💰", Color3.fromRGB(255, 110, 110), "trainer", state.Money >= cost)
+	else
+		itemRow(listFrame, order, "🏋️ Тренажёр силы · МАКС", "Сила за подъём: " .. Config.StrengthPerRep(sTier) .. " 💪", "MAX", Color3.fromRGB(70, 72, 80), nil, false)
+	end
+
+	-- Следы
+	for id, trail in ipairs(Config.Trails) do
+		order += 1
+		local owned = state.Trails[tostring(id)] == true
+		if owned then
+			itemRow(listFrame, order, "✨ " .. trail.Name, "+" .. trail.Bonus .. " к скорости бега", "КУПЛЕНО", Color3.fromRGB(70, 72, 80), nil, false)
+		else
+			itemRow(listFrame, order, "✨ " .. trail.Name, "+" .. trail.Bonus .. " к скорости бега", fmt(trail.Cost) .. " 💰", trail.Color, "trail:" .. id, state.Money >= trail.Cost)
+		end
+	end
 end
 
-function ShopUI.Init(deps)
-	local remotes = deps.Remotes
+local function toggle()
+	if not frame then return end
+	frame.Visible = not frame.Visible
+	if frame.Visible then
+		rebuild()
+	end
+end
 
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "BuzzShop"
-	gui.ResetOnSpawn = false
-	gui.Enabled = false
+function ShopUI.Init(c)
+	ctx = c
+	local player = Players.LocalPlayer
+	local gui = player:WaitForChild("PlayerGui")
 
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 640, 0, 470)
-	frame.Position = UDim2.new(0.5, -320, 0.5, -235)
-	frame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
-	corner(frame, 16)
-	frame.Parent = gui
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "RushShop"
+	screen.ResetOnSpawn = false
+	screen.Parent = gui
+
+	local f = Instance.new("Frame")
+	f.Size = UDim2.new(0, 460, 0, 400)
+	f.Position = UDim2.new(0.5, -230, 0.5, -200)
+	f.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
+	f.BackgroundTransparency = 0.05
+	f.BorderSizePixel = 0
+	f.Visible = false
+	f.Parent = screen
+	frame = f
+	local fc = Instance.new("UICorner")
+	fc.CornerRadius = UDim.new(0, 14)
+	fc.Parent = f
 
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -60, 0, 50)
-	title.Position = UDim2.new(0, 16, 0, 4)
+	title.Size = UDim2.new(1, -60, 0, 44)
+	title.Position = UDim2.new(0, 16, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "🛒 Магазин деталей"
+	title.Text = "🛒 МАГАЗИН"
 	title.Font = Enum.Font.FredokaOne
-	title.TextSize = 30
-	title.TextColor3 = Color3.fromRGB(255, 210, 60)
+	title.TextSize = 26
+	title.TextColor3 = Color3.fromRGB(255, 190, 60)
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = frame
+	title.Parent = f
 
 	local close = Instance.new("TextButton")
-	close.Size = UDim2.new(0, 44, 0, 44)
-	close.Position = UDim2.new(1, -52, 0, 6)
-	close.BackgroundColor3 = Color3.fromRGB(226, 66, 64)
-	close.Text = "✖"
+	close.Size = UDim2.new(0, 40, 0, 40)
+	close.Position = UDim2.new(1, -48, 0, 4)
+	close.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	close.Text = "✕"
 	close.Font = Enum.Font.FredokaOne
 	close.TextSize = 22
 	close.TextColor3 = Color3.new(1, 1, 1)
-	corner(close)
-	close.Parent = frame
-	close.MouseButton1Click:Connect(function() gui.Enabled = false end)
+	close.Parent = f
+	local cc = Instance.new("UICorner")
+	cc.CornerRadius = UDim.new(0, 10)
+	cc.Parent = close
+	close.MouseButton1Click:Connect(toggle)
 
-	-- Вкладки ----------------------------------------------------------------------
-	local tabs = Instance.new("Frame")
-	tabs.Size = UDim2.new(1, -32, 0, 44)
-	tabs.Position = UDim2.new(0, 16, 0, 56)
-	tabs.BackgroundTransparency = 1
-	tabs.Parent = frame
-	local tabLayout = Instance.new("UIListLayout")
-	tabLayout.FillDirection = Enum.FillDirection.Horizontal
-	tabLayout.Padding = UDim.new(0, 6)
-	tabLayout.Parent = tabs
+	local scroll = Instance.new("ScrollingFrame")
+	scroll.Size = UDim2.new(1, -16, 1, -60)
+	scroll.Position = UDim2.new(0, 8, 0, 52)
+	scroll.BackgroundTransparency = 1
+	scroll.ScrollBarThickness = 6
+	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroll.Parent = f
+	listFrame = scroll
 
-	local list = Instance.new("ScrollingFrame")
-	list.Size = UDim2.new(1, -32, 1, -116)
-	list.Position = UDim2.new(0, 16, 0, 108)
-	list.BackgroundTransparency = 1
-	list.ScrollBarThickness = 6
-	list.CanvasSize = UDim2.new(0, 0, 0, 0)
-	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	list.Parent = frame
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Padding = UDim.new(0, 10)
-	listLayout.Parent = list
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = scroll
 
-	local currentCategory = "Hull"
-	local currentState = nil
-
-	local function refresh()
-		if not currentState then return end
-		for _, ch in ipairs(list:GetChildren()) do
-			if ch:IsA("Frame") then ch:Destroy() end
+	-- обновления состояния
+	local remotes = ReplicatedStorage:WaitForChild("RushRemotes")
+	remotes.StateChanged.OnClientEvent:Connect(function(data)
+		state = data
+		if frame and frame.Visible then
+			rebuild()
 		end
-		for _, tabBtn in ipairs(tabs:GetChildren()) do
-			if tabBtn:IsA("TextButton") then
-				local sel = tabBtn:GetAttribute("Category") == currentCategory
-				tabBtn.BackgroundColor3 = sel and Color3.fromRGB(255, 210, 60) or Color3.fromRGB(60, 66, 80)
-				tabBtn.TextColor3 = sel and Color3.fromRGB(30, 30, 35) or Color3.new(1, 1, 1)
-			end
-		end
-
-		local parts = Config.Parts[currentCategory]
-		local owned = currentState.OwnedParts[currentCategory] or {}
-		for _, part in ipairs(parts) do
-			local card = Instance.new("Frame")
-			card.Size = UDim2.new(1, -6, 0, 74)
-			card.BackgroundColor3 = Color3.fromRGB(45, 52, 66)
-			corner(card, 12)
-			card.Parent = list
-
-			local isOwned = owned[part.Tier] == true
-			local prevOwned = part.Tier == 1 or owned[part.Tier - 1] == true
-			local affordable = currentState.Money >= part.Cost
-
-			local dot = Instance.new("Frame")
-			dot.Size = UDim2.new(0, 52, 0, 52)
-			dot.Position = UDim2.new(0, 12, 0.5, -26)
-			dot.BackgroundColor3 = isOwned and Color3.fromRGB(90, 220, 100) or Color3.fromRGB(90, 96, 112)
-			corner(dot, 26)
-			dot.Parent = card
-			local tierLbl = Instance.new("TextLabel")
-			tierLbl.Size = UDim2.new(1, 0, 1, 0)
-			tierLbl.BackgroundTransparency = 1
-			tierLbl.Text = "T" .. part.Tier
-			tierLbl.Font = Enum.Font.FredokaOne
-			tierLbl.TextSize = 24
-			tierLbl.TextColor3 = Color3.fromRGB(30, 30, 35)
-			tierLbl.Parent = dot
-
-			local nameLbl = Instance.new("TextLabel")
-			nameLbl.Size = UDim2.new(1, -240, 0, 34)
-			nameLbl.Position = UDim2.new(0, 76, 0, 6)
-			nameLbl.BackgroundTransparency = 1
-			nameLbl.Text = part.Name
-			nameLbl.Font = Enum.Font.FredokaOne
-			nameLbl.TextSize = 21
-			nameLbl.TextColor3 = Color3.new(1, 1, 1)
-			nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-			nameLbl.Parent = card
-
-			local statLbl = Instance.new("TextLabel")
-			statLbl.Size = UDim2.new(1, -240, 0, 26)
-			statLbl.Position = UDim2.new(0, 76, 0, 40)
-			statLbl.BackgroundTransparency = 1
-			statLbl.Text = statText(currentCategory, part)
-			statLbl.Font = Enum.Font.Gotham
-			statLbl.TextSize = 16
-			statLbl.TextColor3 = Color3.fromRGB(170, 180, 195)
-			statLbl.TextXAlignment = Enum.TextXAlignment.Left
-			statLbl.Parent = card
-
-			local buyBtn = Instance.new("TextButton")
-			buyBtn.Size = UDim2.new(0, 140, 0, 48)
-			buyBtn.Position = UDim2.new(1, -152, 0.5, -24)
-			buyBtn.Font = Enum.Font.FredokaOne
-			buyBtn.TextSize = 20
-			corner(buyBtn)
-			buyBtn.Parent = card
-
-			if isOwned then
-				buyBtn.Text = "✔ Куплено"
-				buyBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 80)
-				buyBtn.TextColor3 = Color3.new(1, 1, 1)
-				buyBtn.AutoButtonColor = false
-			elseif not prevOwned then
-				buyBtn.Text = "🔒 T" .. (part.Tier - 1)
-				buyBtn.BackgroundColor3 = Color3.fromRGB(80, 84, 94)
-				buyBtn.TextColor3 = Color3.fromRGB(170, 174, 184)
-				buyBtn.AutoButtonColor = false
-			else
-				buyBtn.Text = "🪙 " .. part.Cost
-				buyBtn.BackgroundColor3 = affordable and Color3.fromRGB(245, 150, 50) or Color3.fromRGB(150, 90, 50)
-				buyBtn.TextColor3 = Color3.new(1, 1, 1)
-				buyBtn.MouseButton1Click:Connect(function()
-					remotes.BuyPart:FireServer(currentCategory, part.Tier)
-				end)
-			end
-		end
-	end
-
-	for _, category in ipairs(Config.PartCategories) do
-		local b = Instance.new("TextButton")
-		b.Size = UDim2.new(0, 116, 1, 0)
-		b.Text = Config.CategoryNames[category]
-		b.Font = Enum.Font.FredokaOne
-		b.TextSize = 17
-		b:SetAttribute("Category", category)
-		corner(b)
-		b.Parent = tabs
-		b.MouseButton1Click:Connect(function()
-			currentCategory = category
-			refresh()
-		end)
-	end
-
-	gui.Parent = player:WaitForChild("PlayerGui")
-
-	local api = {}
-	function api.Open(state)
-		currentState = state
-		gui.Enabled = true
-		refresh()
-	end
-	function api.Refresh(state)
-		currentState = state
-		if gui.Enabled then refresh() end
-	end
-	function api.IsOpen()
-		return gui.Enabled
-	end
-	return api
+	end)
+	task.spawn(function()
+		state = remotes.GetState:InvokeServer()
+		rebuild()
+	end)
 end
+
+ShopUI.Toggle = toggle
 
 return ShopUI

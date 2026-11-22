@@ -1,0 +1,157 @@
+===== /StarterPack/Tool/DumbbellSetup (Script) =====
+local tool = script.Parent
+local dumbbell = tool:WaitForChild("Dumbell 1")
+local handle = tool:WaitForChild("Handle")
+
+for _, part in ipairs(dumbbell:GetDescendants()) do
+	if part:IsA("BasePart") then
+		part.Anchored = false
+		part.CanCollide = false
+
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = handle
+		weld.Part1 = part
+		weld.Parent = handle
+	end
+end
+
+
+===== /ServerScriptService/BaseSystem (Script) =====
+local Players = game:GetService("Players")
+
+local baseFolder = workspace:WaitForChild("base")
+
+local bases = {
+	baseFolder:WaitForChild("База 1"),
+	baseFolder:WaitForChild("База 2"),
+	baseFolder:WaitForChild("База 3")
+}
+
+local owners = {}
+
+-- Создаём табличку для базы
+local function createSign(base)
+	local oldSign = base:FindFirstChild("PlayerNameSign")
+
+	if oldSign then
+		return oldSign
+	end
+
+	local spawn = base:FindFirstChild("SpawnLocation", true)
+
+	if not spawn then
+		warn("Не найден SpawnLocation в " .. base.Name)
+		return nil
+	end
+
+	local signPart = Instance.new("Part")
+	signPart.Name = "PlayerNameSign"
+	signPart.Size = Vector3.new(5, 2.5, 0.3)
+	signPart.Anchored = true
+	signPart.CanCollide = false
+	signPart.Transparency = 0
+	signPart.CFrame = spawn.CFrame * CFrame.new(0, 3, -6)
+	signPart.Parent = base
+
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "NameGui"
+	gui.Size = UDim2.new(0, 300, 0, 120)
+	gui.StudsOffset = Vector3.new(0, 1.5, 0)
+	gui.AlwaysOnTop = true
+	gui.Parent = signPart
+
+	local text = Instance.new("TextLabel")
+	text.Name = "NameLabel"
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.BackgroundTransparency = 0
+	text.Text = "СВОБОДНО"
+	text.TextScaled = true
+	text.Font = Enum.Font.GothamBold
+	text.TextColor3 = Color3.new(1, 1, 1)
+	text.Parent = gui
+
+	return signPart
+end
+
+-- Создаём таблички у всех баз
+for _, base in ipairs(bases) do
+	createSign(base)
+end
+
+local function setSign(base, playerName)
+	local sign = base:FindFirstChild("PlayerNameSign")
+
+	if not sign then
+		return
+	end
+
+	local gui = sign:FindFirstChild("NameGui")
+
+	if not gui then
+		return
+	end
+
+	local label = gui:FindFirstChild("NameLabel")
+
+	if not label then
+		return
+	end
+
+	label.Text = playerName
+end
+
+local function getFreeBase()
+	for _, base in ipairs(bases) do
+		if not owners[base] then
+			return base
+		end
+	end
+
+	return nil
+end
+
+Players.PlayerAdded:Connect(function(player)
+
+	local base = getFreeBase()
+
+	if not base then
+		player:Kick("Все базы заняты!")
+		return
+	end
+
+	owners[base] = player
+
+	print(player.Name .. " получил " .. base.Name)
+
+	-- Имя на табличке
+	setSign(base, player.DisplayName)
+
+	-- Телепорт на базу
+	local spawn = base:FindFirstChild("SpawnLocation", true)
+
+	if spawn then
+		player.CharacterAdded:Connect(function(character)
+			task.wait(0.2)
+			character:PivotTo(spawn.CFrame + Vector3.new(0, 3, 0))
+		end)
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+
+	for base, owner in pairs(owners) do
+
+		if owner == player then
+			owners[base] = nil
+
+			-- Снова показываем "СВОБОДНО"
+			setSign(base, "СВОБОДНО")
+
+			break
+		end
+	end
+end)
+
+===== /ServerScriptService/StrengthSystem (Script) =====
+
+

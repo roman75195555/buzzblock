@@ -1,6 +1,6 @@
 --!strict
 --==============================================================================
--- BuzzBlocks :: Main
+-- SeedRush :: Main
 -- Точка входа сервера: создаёт remotes, загружает и запускает сервисы.
 --==============================================================================
 
@@ -11,7 +11,7 @@ local Modules = ReplicatedStorage:WaitForChild("Modules")
 
 -- Remotes -------------------------------------------------------------------
 local remotes = Instance.new("Folder")
-remotes.Name = "BuzzRemotes"
+remotes.Name = "RushRemotes"
 
 local function remoteEvent(name: string): RemoteEvent
 	local r = Instance.new("RemoteEvent")
@@ -28,16 +28,10 @@ local function remoteFunction(name: string): RemoteFunction
 end
 
 local Remotes = {
-	GetState     = remoteFunction("GetState"),     -- клиент запрашивает полный профиль
-	BuyPart      = remoteEvent("BuyPart"),         -- (category, tier)
-	EquipPart    = remoteEvent("EquipPart"),       -- (category, tier)
-	BuildSub     = remoteEvent("BuildSub"),        -- собрать подлодку на стапеле
-	PlantSeed    = remoteEvent("PlantSeed"),       -- (slotIndex, animalId)
-	CollectBee   = remoteEvent("CollectBee"),      -- (slotIndex)
-	Notify       = remoteEvent("Notify"),          -- сервер -> клиент: тост (text, colorName)
-	StateChanged = remoteEvent("StateChanged"),    -- сервер -> клиент: обновление профиля
-	OpenShop     = remoteEvent("OpenShop"),        -- сервер -> клиент: открыть магазин
-	OpenBuild    = remoteEvent("OpenBuild"),       -- сервер -> клиент: открыть верфь
+	GetState     = remoteFunction("GetState"),   -- клиент запрашивает полный профиль
+	BuyUpgrade   = remoteEvent("BuyUpgrade"),    -- (kind: "treadmill" | "trainer" | "trail:N")
+	Notify       = remoteEvent("Notify"),        -- сервер -> клиент: тост (text, colorName)
+	StateChanged = remoteEvent("StateChanged"),  -- сервер -> клиент: обновление профиля
 	Folder       = remotes,
 }
 remotes.Parent = ReplicatedStorage
@@ -53,12 +47,9 @@ local ctx = {
 local serviceOrder = {
 	"DataService",
 	"EconomyService",
-	"WorldService",
 	"BaseService",
-	"PlantService",
-	"BeeService",
-	"SubmarineService",
-	"AnimalService",
+	"BossService",
+	"ShopService",
 }
 
 for _, name in ipairs(serviceOrder) do
@@ -79,4 +70,4 @@ for _, name in ipairs(serviceOrder) do
 	end
 end
 
-print("[BuzzBlocks] Сервер запущен. Сервисов: " .. #serviceOrder)
+print("[SeedRush] Сервер запущен. Сервисов: " .. #serviceOrder)

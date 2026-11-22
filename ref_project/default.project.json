@@ -1,0 +1,16 @@
+{
+  "name": "ref_project",
+  "tree": {
+    "$className": "DataModel",
+    "Workspace": { "$className": "Workspace" },
+    "ReplicatedStorage": { "$className": "ReplicatedStorage" },
+    "ServerScriptService": { "$className": "ServerScriptService" },
+    "ServerStorage": { "$className": "ServerStorage" },
+    "StarterGui": { "$className": "StarterGui" },
+    "StarterPack": { "$className": "StarterPack" },
+    "StarterPlayer": { "$className": "StarterPlayer" },
+    "Lighting": { "$className": "Lighting" },
+    "Teams": { "$className": "Teams" },
+    "SoundService": { "$className": "SoundService" }
+  }
+}

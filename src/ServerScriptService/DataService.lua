@@ -1,6 +1,6 @@
 --!strict
 --==============================================================================
--- BuzzBlocks :: DataService
+-- SeedRush :: DataService
 -- Профили игроков: DataStore, автосохранение, сохранение при выходе.
 --==============================================================================
 
@@ -12,26 +12,20 @@ local DataService = {}
 local ctx
 local store
 
-local STORE_NAME = "BuzzBlocks_v1"
+local STORE_NAME = "SeedRush_v1"
 local profiles: { [Player]: any } = {}
 
 -- Шаблон нового профиля -------------------------------------------------------
 local function defaultData(Config)
 	return {
 		Money = Config.StartMoney,
-		-- Купленные детали: category -> { tier = true }. Тир 1 выдаётся сразу.
-		OwnedParts = {
-			Hull = { [1] = true }, Engine = { [1] = true }, Propeller = { [1] = true },
-			Tank = { [1] = true }, Wheel = { [1] = true },
-		},
-		-- Выбранные детали для сборки
-		Equipped = { Hull = 1, Engine = 1, Propeller = 1, Tank = 1, Wheel = 1 },
-		-- Семена: animalId -> количество
-		Seeds = {},
-		-- Грядки: slotIndex -> { Seed = animalId, PlantedAt = os.time(), BeeCollected = bool }
-		Plants = {},
-		-- Пчёлы: { { Animal = id, Mutation = id, Scale = n, Income = n, Name = s } }
-		Bees = {},
+		Speed = 0,          -- очки скорости (влияют на WalkSpeed)
+		Strength = 0,       -- сила (гейт кражи семян)
+		TreadmillTier = 1,  -- тир беговой дорожки
+		TrainerTier = 1,    -- тир тренажёра силы
+		Trails = {},        -- trailId -> true
+		Seeds = {},         -- zoneId(string) -> количество
+		Plots = {},         -- slotIndex(string) -> { Zone = n, PlantedAt = os.time() }
 	}
 end
 
@@ -77,9 +71,16 @@ function DataService.AddMoney(player: Player, amount: number)
 	if coins then coins.Value = data.Money end
 end
 
+function DataService.TrySpend(player: Player, amount: number): boolean
+	local data = profiles[player]
+	if not data then return false end
+	if data.Money < amount then return false end
+	DataService.AddMoney(player, -amount)
+	return true
+end
+
 -- Загрузка --------------------------------------------------------------------
 local function onPlayerAdded(player: Player)
-	-- leaderstats
 	local ls = Instance.new("Folder")
 	ls.Name = "leaderstats"
 	local coins = Instance.new("IntValue")
@@ -94,7 +95,6 @@ local function onPlayerAdded(player: Player)
 			return store:GetAsync(key(player))
 		end)
 		if ok and type(result) == "table" then
-			-- мягкий мердж: новые поля из шаблона не теряются
 			for k, v in pairs(defaultData(ctx.Config)) do
 				if result[k] == nil then result[k] = v end
 			end
@@ -106,7 +106,6 @@ local function onPlayerAdded(player: Player)
 	profiles[player] = data
 	coins.Value = data.Money
 
-	-- клиент запрашивает состояние после загрузки UI
 	task.defer(function()
 		task.wait(1)
 		pushState(player)
@@ -155,7 +154,6 @@ function DataService.Init(c)
 end
 
 function DataService.Start()
-	-- автосохранение
 	while true do
 		task.wait(ctx.Config.AutosaveInterval)
 		for _, p in ipairs(Players:GetPlayers()) do

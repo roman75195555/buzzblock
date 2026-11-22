@@ -1,0 +1,38 @@
+-- Remodel-скрипт: выгрузка структуры карты в текст
+local game = remodel.readPlaceFile("reference_map.rbxl")
+
+local out = {}
+local function add(s)
+	table.insert(out, s)
+end
+
+local function fmtV3(v)
+	return string.format("(%.1f, %.1f, %.1f)", v.X, v.Y, v.Z)
+end
+
+local function dump(inst, depth)
+	local info = string.rep("  ", depth) .. inst.ClassName .. "  \"" .. inst.Name .. "\""
+	local ok, _ = pcall(function() return inst.Size end)
+	if ok and inst.ClassName ~= "Terrain" then
+		pcall(function()
+			info = info .. "  size=" .. fmtV3(inst.Size) .. "  pos=" .. fmtV3(inst.Position)
+		end)
+		pcall(function()
+			info = info .. "  color=" .. tostring(inst.Color) .. "  mat=" .. tostring(inst.Material)
+		end)
+		pcall(function()
+			if inst.Shape then info = info .. "  shape=" .. tostring(inst.Shape) end
+		end)
+	end
+	add(info)
+	for _, child in ipairs(inst:GetChildren()) do
+		dump(child, depth + 1)
+	end
+end
+
+for _, child in ipairs(game:GetChildren()) do
+	dump(child, 0)
+end
+
+remodel.writeFile("map_dump.txt", table.concat(out, "\n"))
+print("Instances dumped:", #out)

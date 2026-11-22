@@ -1,5 +1,5 @@
 {
-  "name": "BuzzBlocks",
+  "name": "SeedRush",
   "globIgnorePaths": ["**/.DS_Store", "**/*.md"],
   "tree": {
     "$className": "DataModel",
@@ -21,35 +21,75 @@
         "$path": "src/StarterPlayerScripts"
       },
       "$properties": {
-        "CameraMaxZoomDistance": 120,
+        "CameraMaxZoomDistance": 150,
         "CameraMinZoomDistance": 8,
         "CharacterUseJumpPower": true,
         "CharacterJumpPower": 55,
-        "CharacterWalkSpeed": 20
+        "CharacterWalkSpeed": 16
+      }
+    },
+
+    "StarterPack": {
+      "$className": "StarterPack",
+      "Dumbbell": {
+        "$path": "assets/DumbbellTool.rbxm"
       }
     },
 
     "Workspace": {
       "$className": "Workspace",
       "$properties": {
-        "Gravity": 120,
+        "Gravity": 196.2,
         "StreamingEnabled": false
+      },
+      "Map": {
+        "$path": "assets/Map.rbxm"
       }
     },
 
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
-        "Ambient": [0.27, 0.27, 0.31],
-        "OutdoorAmbient": [0.35, 0.37, 0.41],
+        "Ambient": [0.35, 0.35, 0.38],
+        "OutdoorAmbient": [0.45, 0.47, 0.5],
         "Brightness": 2,
         "ClockTime": 14,
         "GeographicLatitude": 35,
-        "FogEnd": 1500,
-        "FogStart": 400,
-        "FogColor": [0.67, 0.82, 0.9],
         "GlobalShadows": true,
         "Technology": "Future"
+      },
+      "Sky": {
+        "$className": "Sky",
+        "$properties": {
+          "CelestialBodiesShown": true,
+          "SunAngularSize": 11
+        }
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.3,
+          "Offset": 0.25,
+          "Color": [0.75, 0.82, 0.9],
+          "Decay": [0.9, 0.9, 0.95],
+          "Glare": 0.2,
+          "Haze": 1.5
+        }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.6,
+          "Size": 24,
+          "Threshold": 1.4
+        }
+      },
+      "SunRays": {
+        "$className": "SunRaysEffect",
+        "$properties": {
+          "Intensity": 0.08,
+          "Spread": 0.8
+        }
       }
     },
 
