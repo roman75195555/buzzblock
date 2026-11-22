@@ -203,6 +203,11 @@ function ShopUI.Init(c)
 
 	-- обновления состояния
 	local remotes = ReplicatedStorage:WaitForChild("RushRemotes")
+	remotes.OpenShop.OnClientEvent:Connect(function()
+		if frame and not frame.Visible then
+			toggle()
+		end
+	end)
 	remotes.StateChanged.OnClientEvent:Connect(function(data)
 		state = data
 		if frame and frame.Visible then

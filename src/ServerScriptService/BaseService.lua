@@ -1,8 +1,8 @@
 --!strict
 --==============================================================================
 -- SeedRush :: BaseService
--- Выдача баз (как в референсе), таблички, беговая дорожка, гантеля (сила),
--- грядки с семенами. Все объекты строятся поверх карты reference_map.
+-- Выдача баз, таблички (подвешены, компактные), исходные неоновые площадки
+-- для яиц, беговая дорожка и тренажёр ВНЕ базы, физический магазин.
 --==============================================================================
 
 local Players = game:GetService("Players")
@@ -11,12 +11,13 @@ local RunService = game:GetService("RunService")
 local BaseService = {}
 local ctx
 
-local bases: { Model } = {}            -- модели баз из карты
-local owners: { [Model]: Player } = {} -- base -> player
+local bases: { Model } = {}
+local owners: { [Model]: Player } = {}
 local playerBase: { [Player]: Model } = {}
-local treadmillPads: { [Model]: BasePart } = {} -- base -> pad
-local plotParts: { [Model]: { BasePart } } = {} -- base -> {soil parts}
-local plotViews: { [Model]: { Model? } } = {}   -- base -> {plant models}
+local treadmillPads: { [Model]: BasePart } = {}
+local eggPads: { [Model]: { BasePart } } = {}     -- исходные неоновые площадки
+local padPrompts: { [Model]: { ProximityPrompt } } = {}
+local padViews: { [Model]: { Model? } } = {}
 
 -- Вспомогательное --------------------------------------------------------------
 local function notify(player: Player, text: string, colorName: string?)
@@ -48,36 +49,39 @@ local function updateWalkSpeed(player: Player)
 end
 BaseService.UpdateWalkSpeed = updateWalkSpeed
 
--- Постройка объектов базы -------------------------------------------------------
+-- Компактная подвесная табличка ---------------------------------------------------
 local function buildSign(base: Model, spawn: SpawnLocation)
 	local B = ctx.Build
+	local signPos = spawn.CFrame * CFrame.new(0, 9, -2) * CFrame.Angles(0, math.pi, 0)
 	local signPart = B.Part(base, {
-		Size = Vector3.new(8, 3, 0.5),
-		CFrame = spawn.CFrame * CFrame.new(0, 4, -8) * CFrame.Angles(0, math.pi, 0),
+		Size = Vector3.new(6, 1.8, 0.4),
+		CFrame = signPos,
 		Color = Color3.fromRGB(40, 40, 48),
 		Name = "PlayerNameSign",
+		CanCollide = false,
+	})
+	-- неоновая рамка
+	B.Neon(base, {
+		Size = Vector3.new(6.3, 0.25, 0.45),
+		CFrame = signPos * CFrame.new(0, 1, 0),
+		Color = Color3.fromRGB(255, 210, 60),
+		CanCollide = false,
 	})
 	B.Neon(base, {
-		Size = Vector3.new(8.4, 0.4, 0.6),
-		CFrame = signPart.CFrame * CFrame.new(0, 1.7, 0),
+		Size = Vector3.new(6.3, 0.25, 0.45),
+		CFrame = signPos * CFrame.new(0, -1, 0),
 		Color = Color3.fromRGB(255, 210, 60),
+		CanCollide = false,
 	})
-	B.Neon(base, {
-		Size = Vector3.new(8.4, 0.4, 0.6),
-		CFrame = signPart.CFrame * CFrame.new(0, -1.7, 0),
-		Color = Color3.fromRGB(255, 210, 60),
-	})
-	-- столбики
-	B.Part(base, {
-		Size = Vector3.new(0.5, 4, 0.5),
-		CFrame = signPart.CFrame * CFrame.new(-3.5, -3.5, 0),
-		Color = Color3.fromRGB(70, 70, 80),
-	})
-	B.Part(base, {
-		Size = Vector3.new(0.5, 4, 0.5),
-		CFrame = signPart.CFrame * CFrame.new(3.5, -3.5, 0),
-		Color = Color3.fromRGB(70, 70, 80),
-	})
+	-- подвесы вверх (к «потолку» визуально)
+	for _, sx in ipairs({ -2.5, 2.5 }) do
+		B.Part(base, {
+			Size = Vector3.new(0.25, 5, 0.25),
+			CFrame = signPos * CFrame.new(sx, 3.4, 0),
+			Color = Color3.fromRGB(70, 70, 80),
+			CanCollide = false,
+		})
+	end
 	B.SignText(signPart, "СВОБОДНО", Color3.fromRGB(255, 220, 80), nil, Enum.NormalId.Front)
 	return signPart
 end
@@ -91,12 +95,11 @@ local function setSign(base: Model, text: string)
 	end
 end
 
+-- Беговая дорожка — ВНЕ базы, перед ней ------------------------------------------
 local function buildTreadmill(base: Model, center: Vector3)
 	local B = ctx.Build
-	local pos = center + Vector3.new(-13, 0, 2)
-	-- рама
+	local pos = Vector3.new(center.X - 14, 4.8, center.Z + 52)
 	B.Part(base, { Size = Vector3.new(9, 0.8, 16), CFrame = CFrame.new(pos + Vector3.new(0, 0.4, 0)), Color = Color3.fromRGB(45, 45, 55), Name = "TreadmillFrame" })
-	-- лента
 	local belt = B.Part(base, {
 		Size = Vector3.new(7, 0.4, 14),
 		CFrame = CFrame.new(pos + Vector3.new(0, 1, 0)),
@@ -104,41 +107,39 @@ local function buildTreadmill(base: Model, center: Vector3)
 		Material = Enum.Material.SmoothPlastic,
 		Name = "TreadmillBelt",
 	})
-	-- поручни
 	for _, sx in ipairs({ -4.2, 4.2 }) do
 		B.Part(base, { Size = Vector3.new(0.5, 2.5, 0.5), CFrame = CFrame.new(pos + Vector3.new(sx, 2.2, -6.5)), Color = Color3.fromRGB(60, 60, 70) })
 	end
 	B.Part(base, { Size = Vector3.new(9, 0.5, 0.5), CFrame = CFrame.new(pos + Vector3.new(0, 3.4, -6.5)), Color = Color3.fromRGB(60, 60, 70) })
-	-- панель
-	local panel = B.Part(base, { Size = Vector3.new(6, 2, 0.4), CFrame = CFrame.new(pos + Vector3.new(0, 4.6, -6.5)) * CFrame.Angles(math.rad(-15), 0, 0), Color = Color3.fromRGB(30, 30, 38) })
-	B.SignText(panel, "БЕГ + СКОРОСТЬ", Color3.fromRGB(90, 220, 255))
-	-- неоновые стрелки на ленте
+	-- компактная панель
+	local panel = B.Part(base, { Size = Vector3.new(5, 1.4, 0.3), CFrame = CFrame.new(pos + Vector3.new(0, 4.4, -6.5)) * CFrame.Angles(math.rad(-15), 0, 0), Color = Color3.fromRGB(30, 30, 38), CanCollide = false })
+	B.SignText(panel, "🏃 +СКОРОСТЬ", Color3.fromRGB(90, 220, 255))
+	B.Billboard(belt, "Встань на ленту: качается ⚡скорость", Color3.fromRGB(140, 230, 255), 5)
 	for i = -1, 1 do
 		local arrow = B.Wedge(base, {
 			Size = Vector3.new(2, 0.2, 2),
 			CFrame = CFrame.new(pos + Vector3.new(0, 1.25, i * 4)) * CFrame.Angles(0, math.pi, 0),
 			Color = Color3.fromRGB(140, 230, 255),
 			Name = "Arrow",
+			CanCollide = false,
 		})
 		arrow.Material = Enum.Material.Neon
 	end
 	treadmillPads[base] = belt
 end
 
-local function buildDumbbellRack(base: Model, center: Vector3)
+-- Тренажёр силы — ВНЕ базы, перед ней ---------------------------------------------
+local function buildGym(base: Model, center: Vector3)
 	local B = ctx.Build
-	local pos = center + Vector3.new(13, 0, 2)
-	-- помост
+	local pos = Vector3.new(center.X + 14, 4.8, center.Z + 52)
 	B.Part(base, { Size = Vector3.new(10, 0.8, 10), CFrame = CFrame.new(pos + Vector3.new(0, 0.4, 0)), Color = Color3.fromRGB(120, 60, 40), Material = Enum.Material.Wood, Name = "GymFloor" })
-	-- большая декоративная гантеля
 	local bar = B.Part(base, {
 		Size = Vector3.new(0.8, 0.8, 7),
-		CFrame = CFrame.new(pos + Vector3.new(0, 2.2, 0)),
+		CFrame = CFrame.new(pos + Vector3.new(0, 2.2, 0)) * CFrame.Angles(math.rad(90), 0, 0),
 		Color = Color3.fromRGB(160, 160, 170),
 		Shape = Enum.PartType.Cylinder,
 		Name = "Bar",
 	})
-	bar.CFrame = bar.CFrame * CFrame.Angles(math.rad(90), 0, 0)
 	for _, sz in ipairs({ -3.2, 3.2 }) do
 		local w = B.Part(base, {
 			Size = Vector3.new(1.6, 3.4, 3.4),
@@ -148,57 +149,45 @@ local function buildDumbbellRack(base: Model, center: Vector3)
 		})
 		w.Material = Enum.Material.Metal
 	end
-	local sign = B.Part(base, { Size = Vector3.new(6, 1.6, 0.4), CFrame = CFrame.new(pos + Vector3.new(0, 5.4, -4.6)), Color = Color3.fromRGB(30, 30, 38) })
-	B.SignText(sign, "ГАНТЕЛЯ = СИЛА (клик)", Color3.fromRGB(255, 130, 130))
+	B.Billboard(bar, "🏋️ Возьми гантелю и кликай: +💪 сила", Color3.fromRGB(255, 150, 150), 4)
 end
 
-local function buildPlots(base: Model, center: Vector3)
-	local B = ctx.Build
-	plotParts[base] = {}
-	plotViews[base] = {}
-	local startX = center.X - 9
-	local startZ = center.Z - 22
-	for i = 1, ctx.Config.PlotCount do
-		local ox = startX + ((i - 1) % 2) * 18
-		local oz = startZ + math.floor((i - 1) / 2) * 14
-		-- грядка
-		local soil = B.Part(base, {
-			Size = Vector3.new(8, 1, 8),
-			CFrame = CFrame.new(ox, center.Y + 0.5, oz),
-			Color = Color3.fromRGB(96, 62, 32),
-			Material = Enum.Material.Ground,
-			Name = "Plot" .. i,
-		})
-		-- рамка
-		for _, d in ipairs({ Vector3.new(4.4, 0, 0), Vector3.new(-4.4, 0, 0), Vector3.new(0, 0, 4.4), Vector3.new(0, 0, -4.4) }) do
-			local horiz = math.abs(d.X) > 0
-			B.Part(base, {
-				Size = horiz and Vector3.new(0.8, 0.8, 8.8) or Vector3.new(8.8, 0.8, 0.8),
-				CFrame = CFrame.new(ox + d.X, center.Y + 0.4, oz + d.Z),
-				Color = Color3.fromRGB(140, 95, 50),
-				Material = Enum.Material.Wood,
-			})
+-- Исходные неоновые площадки базы = места для яиц -----------------------------------
+local function findEggPads(base: Model): { BasePart }
+	local pads: { BasePart } = {}
+	for _, d in ipairs(base:GetDescendants()) do
+		if d:IsA("UnionOperation") then
+			local s = d.Size
+			if math.abs(s.X - 9) < 1.5 and math.abs(s.Z - 9.6) < 1.5 and d.Position.Y < 10 then
+				table.insert(pads, d)
+			end
 		end
-		table.insert(plotParts[base], soil)
-		plotViews[base][i] = nil
 	end
+	-- стабильный порядок: по Z (от входа), затем по X
+	table.sort(pads, function(a, b)
+		if math.abs(a.Position.Z - b.Position.Z) > 1 then
+			return a.Position.Z > b.Position.Z
+		end
+		return a.Position.X < b.Position.X
+	end)
+	return pads
 end
 
--- Растения ----------------------------------------------------------------------
-local function clearPlantView(base: Model, slot: number)
-	local v = plotViews[base] and plotViews[base][slot]
+-- Яйцо / существо на площадке ----------------------------------------------------------
+local function clearPadView(base: Model, slot: number)
+	local v = padViews[base] and padViews[base][slot]
 	if v then
 		v:Destroy()
-		plotViews[base][slot] = nil
+		padViews[base][slot] = nil
 	end
 end
 
-local function updatePlantView(base: Model, slot: number)
+local function updatePadView(base: Model, slot: number)
 	local player = owners[base]
 	if not player then return end
 	local data = getData(player)
 	if not data then return end
-	clearPlantView(base, slot)
+	clearPadView(base, slot)
 	local plot = data.Plots[tostring(slot)]
 	if not plot then return end
 
@@ -206,41 +195,84 @@ local function updatePlantView(base: Model, slot: number)
 	local Config = ctx.Config
 	local zone = Config.Zones[plot.Zone]
 	if not zone then return end
-	local soil = plotParts[base][slot]
-	local p = soil.Position
+	local pad = eggPads[base][slot]
+	local p = pad.Position + Vector3.new(0, 1.3, 0) -- поверх красного поддона
 	local growth = math.clamp((os.time() - plot.PlantedAt) / zone.GrowTime, 0, 1)
 
 	local m = Instance.new("Model")
-	m.Name = "Plant"
-	local h = 1 + growth * 5
-	-- стебель
-	B.Part(m, {
-		Size = Vector3.new(0.6, h, 0.6),
-		CFrame = CFrame.new(p + Vector3.new(0, 0.5 + h / 2, 0)),
-		Color = Color3.fromRGB(60, 160, 60),
-	})
-	-- бутон/цветок
-	local bloom = B.Part(m, {
-		Size = Vector3.new(1.4 + growth * 2, 1.4 + growth * 2, 1.4 + growth * 2),
-		CFrame = CFrame.new(p + Vector3.new(0, 1 + h, 0)),
-		Color = zone.Color,
-		Shape = Enum.PartType.Ball,
-		Material = growth >= 1 and Enum.Material.Neon or Enum.Material.SmoothPlastic,
-	})
-	if growth >= 1 then
-		B.Sparkles(bloom, zone.Color)
-		B.Billboard(bloom, string.format("%s · %d💰/с", zone.Name, zone.Income), Color3.fromRGB(255, 230, 120), 2.5)
+	m.Name = "PadEgg"
+	if growth < 1 then
+		-- яйцо инкубируется
+		local size = 1 + growth * 0.8
+		local egg = B.Part(m, {
+			Size = Vector3.new(size, size * 1.25, size),
+			CFrame = CFrame.new(p + Vector3.new(0, size * 0.7, 0)),
+			Color = zone.Color,
+			Shape = Enum.PartType.Ball,
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+		B.Billboard(egg, string.format("🥚 %d%%", math.floor(growth * 100)), Color3.new(1, 1, 1), 2.2)
 	else
-		B.Billboard(bloom, string.format("Растёт… %d%%", math.floor(growth * 100)), Color3.new(1, 1, 1), 2.5)
+		-- вылупилось существо, приносит доход
+		local body = B.Part(m, {
+			Size = Vector3.new(2.2, 2, 2.2),
+			CFrame = CFrame.new(p + Vector3.new(0, 1.6, 0)),
+			Color = zone.Color,
+			Shape = Enum.PartType.Ball,
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+		-- глаза
+		for _, ex in ipairs({ -0.5, 0.5 }) do
+			B.Neon(m, {
+				Size = Vector3.new(0.35, 0.35, 0.2),
+				CFrame = body.CFrame * CFrame.new(ex, 0.3, -1.05),
+				Color = Color3.new(1, 1, 1),
+				CanCollide = false,
+			})
+		end
+		-- ножки
+		for _, ex in ipairs({ -0.6, 0.6 }) do
+			B.Part(m, {
+				Size = Vector3.new(0.5, 0.8, 0.5),
+				CFrame = body.CFrame * CFrame.new(ex, -1.2, 0),
+				Color = zone.Color:Lerp(Color3.new(0, 0, 0), 0.2),
+				CanCollide = false,
+			})
+		end
+		B.Sparkles(body, zone.Color)
+		B.Billboard(body, string.format("%s · %d💰/с", zone.Name, zone.Income), Color3.fromRGB(255, 230, 120), 2.4)
 	end
 	m.Parent = base
-	plotViews[base][slot] = m
+	padViews[base][slot] = m
 end
 
-local function refreshAllPlants()
+local function refreshAllPads()
 	for base in pairs(bases) do
-		for slot = 1, ctx.Config.PlotCount do
-			updatePlantView(base, slot)
+		if padViews[base] then
+			for slot = 1, #eggPads[base] do
+				updatePadView(base, slot)
+			end
+		end
+	end
+end
+
+local function refreshPrompts()
+	for base, prompts in pairs(padPrompts) do
+		local player = owners[base]
+		local data = player and getData(player)
+		for slot, pp in ipairs(prompts) do
+			local plot = data and data.Plots[tostring(slot)]
+			if plot then
+				local zone = ctx.Config.Zones[plot.Zone]
+				local grown = zone and (os.time() - plot.PlantedAt >= zone.GrowTime)
+				pp.ActionText = if grown then "Убрать" else "Инкубация…"
+				pp.Enabled = grown == true
+			else
+				pp.ActionText = "Поставить яйцо"
+				pp.Enabled = true
+			end
 		end
 	end
 end
@@ -258,10 +290,12 @@ local function bestSeed(data): number?
 	return best
 end
 
-local function setupPlotPrompts()
+local function setupPadPrompts()
 	for base in pairs(bases) do
-		for slot, soil in ipairs(plotParts[base]) do
-			local pp = ctx.Build.Prompt(soil, "Посадить", "Грядка " .. slot)
+		padPrompts[base] = {}
+		for slot, pad in ipairs(eggPads[base]) do
+			local pp = ctx.Build.Prompt(pad, "Поставить яйцо", "Гнездо " .. slot)
+			table.insert(padPrompts[base], pp)
 			pp.Triggered:Connect(function(player)
 				if owners[base] ~= player then
 					notify(player, "Это чужая база!", "error")
@@ -272,27 +306,83 @@ local function setupPlotPrompts()
 				local key = tostring(slot)
 				local plot = data.Plots[key]
 				if plot then
-					-- убрать растение (семя не возвращается)
-					data.Plots[key] = nil
-					clearPlantView(base, slot)
-					ctx.Services.DataService.PushState(player)
-					notify(player, "Растение убрано", "info")
+					local zone = ctx.Config.Zones[plot.Zone]
+					if zone and os.time() - plot.PlantedAt >= zone.GrowTime then
+						data.Plots[key] = nil
+						clearPadView(base, slot)
+						ctx.Services.DataService.PushState(player)
+						notify(player, "Место освобождено", "info")
+					end
 					return
 				end
 				local seed = bestSeed(data)
 				if not seed then
-					notify(player, "Нет семян! Укради их у боссов на дорожке.", "error")
+					notify(player, "Нет яиц! Укради их у боссов на дорожке.", "error")
 					return
 				end
 				data.Seeds[tostring(seed)] -= 1
 				data.Plots[key] = { Zone = seed, PlantedAt = os.time() }
-				updatePlantView(base, slot)
+				updatePadView(base, slot)
 				ctx.Services.DataService.PushState(player)
 				local zone = ctx.Config.Zones[seed]
-				notify(player, "Посажено: " .. zone.Name .. " (доход " .. zone.Income .. "💰/с)", "success")
+				notify(player, "🥚 Яйцо «" .. zone.Name .. "» установлено! Скоро вылупится.", "success")
 			end)
 		end
 	end
+	refreshPrompts()
+end
+
+-- Физический магазин ---------------------------------------------------------------
+local function buildShop()
+	local B = ctx.Build
+	local m = Instance.new("Model")
+	m.Name = "Shop"
+	local pos = Vector3.new(-45, 4.8, 60)
+
+	-- пол и стены
+	B.Part(m, { Size = Vector3.new(22, 1, 18), CFrame = CFrame.new(pos + Vector3.new(0, 0.5, 0)), Color = Color3.fromRGB(150, 95, 50), Material = Enum.Material.Wood })
+	B.Part(m, { Size = Vector3.new(22, 10, 1), CFrame = CFrame.new(pos + Vector3.new(0, 5.5, 8.5)), Color = Color3.fromRGB(200, 140, 70), Material = Enum.Material.Wood })
+	for _, sx in ipairs({ -10.5, 10.5 }) do
+		B.Part(m, { Size = Vector3.new(1, 10, 18), CFrame = CFrame.new(pos + Vector3.new(sx, 5.5, 0)), Color = Color3.fromRGB(200, 140, 70), Material = Enum.Material.Wood })
+	end
+	-- крыша
+	B.Wedge(m, { Size = Vector3.new(24, 4, 20), CFrame = CFrame.new(pos + Vector3.new(0, 12.5, 0)), Color = Color3.fromRGB(180, 60, 50), Material = Enum.Material.RoofShingles })
+	-- прилавок
+	B.Part(m, { Size = Vector3.new(14, 3, 2.5), CFrame = CFrame.new(pos + Vector3.new(0, 2, 4)), Color = Color3.fromRGB(120, 70, 35), Material = Enum.Material.Wood, Name = "Counter" })
+	B.Neon(m, { Size = Vector3.new(14, 0.3, 2.7), CFrame = CFrame.new(pos + Vector3.new(0, 3.6, 4)), Color = Color3.fromRGB(255, 200, 80), CanCollide = false })
+	-- вывеска
+	local signBoard = B.Part(m, { Size = Vector3.new(10, 2.4, 0.5), CFrame = CFrame.new(pos + Vector3.new(0, 9, 8.2)), Color = Color3.fromRGB(40, 30, 20), CanCollide = false })
+	B.SignText(signBoard, "🛒 МАГАЗИН", Color3.fromRGB(255, 200, 80))
+	-- продавец (блочный NPC)
+	local sellerPos = pos + Vector3.new(0, 1, 6)
+	local body = B.Part(m, { Size = Vector3.new(2.4, 3, 1.6), CFrame = CFrame.new(sellerPos + Vector3.new(0, 2.6, 0)), Color = Color3.fromRGB(90, 140, 220), Name = "Seller" })
+	B.Part(m, { Size = Vector3.new(1.8, 1.6, 1.6), CFrame = body.CFrame * CFrame.new(0, 2.4, 0), Color = Color3.fromRGB(255, 210, 170) })
+	for _, ex in ipairs({ -0.45, 0.45 }) do
+		B.Neon(m, { Size = Vector3.new(0.3, 0.3, 0.15), CFrame = body.CFrame * CFrame.new(ex, 2.6, -0.85), Color = Color3.fromRGB(30, 30, 30), CanCollide = false })
+	end
+	-- колпак торговца
+	B.Wedge(m, { Size = Vector3.new(2, 1, 2), CFrame = body.CFrame * CFrame.new(0, 3.6, 0), Color = Color3.fromRGB(200, 60, 50) })
+	B.Billboard(body, "Торговец", Color3.fromRGB(255, 220, 120), 4)
+
+	-- витрина с предметами
+	for i, dx in ipairs({ -5, 0, 5 }) do
+		local item = B.Neon(m, {
+			Size = Vector3.new(1, 1, 1),
+			CFrame = CFrame.new(pos + Vector3.new(dx, 4.4, 4)),
+			Color = Color3.fromRGB(120 + i * 40, 200, 255 - i * 40),
+			Shape = Enum.PartType.Ball,
+			CanCollide = false,
+		})
+		B.Sparkles(item)
+	end
+
+	-- промпт открытия магазина
+	local pp = B.Prompt(body, "Торговать", "Магазин")
+	pp.Triggered:Connect(function(player)
+		ctx.Remotes.OpenShop:FireClient(player)
+	end)
+
+	m.Parent = workspace
 end
 
 -- Выдача баз ---------------------------------------------------------------------
@@ -340,15 +430,15 @@ local function onPlayerAdded(player: Player)
 		updateWalkSpeed(player)
 	end)
 
-	-- восстановить растения этого игрока на его базе
 	task.defer(function()
 		local t0 = os.clock()
 		while not getData(player) and os.clock() - t0 < 10 do
 			task.wait(0.2)
 		end
-		for slot = 1, ctx.Config.PlotCount do
-			updatePlantView(base, slot)
+		for slot = 1, #eggPads[base] do
+			updatePadView(base, slot)
 		end
+		refreshPrompts()
 	end)
 end
 
@@ -358,9 +448,10 @@ local function onPlayerRemoving(player: Player)
 		owners[base] = nil
 		playerBase[player] = nil
 		setSign(base, "СВОБОДНО")
-		for slot = 1, ctx.Config.PlotCount do
-			clearPlantView(base, slot)
+		for slot = 1, #eggPads[base] do
+			clearPadView(base, slot)
 		end
+		refreshPrompts()
 	end
 end
 
@@ -407,7 +498,6 @@ function BaseService.Init(c)
 end
 
 function BaseService.Start()
-	-- найти базы в карте
 	local map = workspace:WaitForChild("Map")
 	local baseFolder = map:WaitForChild("base")
 	local names = { "база 1", "база 2", "база 3" }
@@ -420,12 +510,13 @@ function BaseService.Start()
 		end
 		local center = ctx.Config.Bases[i].Center
 		buildTreadmill(b, center)
-		buildDumbbellRack(b, center)
-		buildPlots(b, center)
+		buildGym(b, center)
+		eggPads[b] = findEggPads(b)
+		padViews[b] = {}
+		print("[BaseService] " .. n .. ": площадок для яиц = " .. #eggPads[b])
 	end
-	setupPlotPrompts()
-
-	-- гантеля остаётся в StarterPack: выдаётся автоматически при каждом возрождении
+	setupPadPrompts()
+	buildShop()
 
 	Players.PlayerAdded:Connect(function(player)
 		onPlayerAdded(player)
@@ -447,8 +538,8 @@ function BaseService.Start()
 		end)
 	end
 
-	-- тик: беговая дорожка + обновление растений
-	local plantTimer = 0
+	-- тик: беговая дорожка + обновление яиц
+	local viewTimer = 0
 	RunService.Heartbeat:Connect(function(dt)
 		for player, base in pairs(playerBase) do
 			local pad = treadmillPads[base]
@@ -459,18 +550,22 @@ function BaseService.Start()
 				if math.abs(d.X) < 5 and math.abs(d.Z) < 8 and math.abs(d.Y) < 5 then
 					local data = getData(player)
 					if data then
-						data.Speed += ctx.Config.SpeedRate(data.TreadmillTier) * dt
-						if math.floor(data.Speed) ~= math.floor(data.Speed - ctx.Config.SpeedRate(data.TreadmillTier) * dt) then
+						local rate = ctx.Config.SpeedRate(data.TreadmillTier)
+						local before = math.floor(data.Speed)
+						data.Speed += rate * dt
+						if math.floor(data.Speed) ~= before then
 							updateWalkSpeed(player)
+							ctx.Services.DataService.PushState(player)
 						end
 					end
 				end
 			end
 		end
-		plantTimer += dt
-		if plantTimer >= 5 then
-			plantTimer = 0
-			refreshAllPlants()
+		viewTimer += dt
+		if viewTimer >= 5 then
+			viewTimer = 0
+			refreshAllPads()
+			refreshPrompts()
 			for _, p in ipairs(Players:GetPlayers()) do
 				ctx.Services.DataService.PushState(p)
 			end

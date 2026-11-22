@@ -17,9 +17,13 @@ Config.MaxWalkSpeed = 60
 
 Config.SafeZoneZ = 40            -- z < 40: базовая зелёная зона, боссы сюда не ходят
 Config.TrackCenterX = -51.9      -- центр дорожки по X
+Config.TrackMinX = -150          -- внутренние границы дорожки
+Config.TrackMaxX = 26
 Config.CatchRadius = 7           -- дистанция поимки боссом
 Config.SeedRespawn = 12          -- сек. до появления нового семени
 Config.BossGiveUpTime = 90       -- сек. погони, потом босс возвращается
+Config.BossLeashHalfZ = 46       -- босс не выходит за границы своей секции
+Config.EscapeDistance = 120      -- оторвался от босса = побег
 
 -- Локации вдоль дорожки (по нарастанию сложности) ---------------------------
 -- Z — центр секции из карты-референса.
@@ -97,6 +101,4 @@ Config.Bases = {
 	[2] = { Center = Vector3.new(-60.8, 5.5, -16.9) },
 	[3] = { Center = Vector3.new(8.1, 5.5, -16.9) },
 }
-Config.PlotCount = 4
-
 return Config

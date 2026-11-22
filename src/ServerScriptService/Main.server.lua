@@ -32,6 +32,7 @@ local Remotes = {
 	BuyUpgrade   = remoteEvent("BuyUpgrade"),    -- (kind: "treadmill" | "trainer" | "trail:N")
 	Notify       = remoteEvent("Notify"),        -- сервер -> клиент: тост (text, colorName)
 	StateChanged = remoteEvent("StateChanged"),  -- сервер -> клиент: обновление профиля
+	OpenShop     = remoteEvent("OpenShop"),      -- сервер -> клиент: открыть магазин
 	Folder       = remotes,
 }
 remotes.Parent = ReplicatedStorage

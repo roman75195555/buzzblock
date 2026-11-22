@@ -30,12 +30,25 @@ type ZoneState = {
 local zones: { ZoneState } = {}
 local carried: { [Player]: number } = {} -- player -> zoneId украденного семени
 local carryMarker: { [Player]: Instance? } = {}
+local carryEggVisual: { [Player]: Instance? } = {}
+
+-- Материалы и украшения боссов/яиц по зонам --------------------------------------
+local ZONE_STYLE = {
+	[1] = { Material = Enum.Material.SmoothPlastic },
+	[2] = { Material = Enum.Material.Grass },
+	[3] = { Material = Enum.Material.Ice },
+	[4] = { Material = Enum.Material.Granite },
+	[5] = { Material = Enum.Material.Sand },
+	[6] = { Material = Enum.Material.CrackedLava },
+	[7] = { Material = Enum.Material.DiamondPlate },
+}
 
 -- Блочный босс --------------------------------------------------------------------
-local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, BasePart, BasePart, BasePart)
+local function buildBoss(parent: Instance, zone: any, zoneId: number, pos: Vector3): (Model, BasePart, BasePart, BasePart)
 	local B = ctx.Build
 	local s = zone.BossScale
 	local c = zone.Color
+	local style = ZONE_STYLE[zoneId]
 
 	local m = Instance.new("Model")
 	m.Name = "Boss_" .. zone.Name
@@ -47,7 +60,7 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 		Name = "BossRoot",
 		CanCollide = true,
 	})
-	root.Material = Enum.Material.SmoothPlastic
+	root.Material = style.Material
 
 	-- голова
 	local head = B.Part(m, {
@@ -55,6 +68,7 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 		CFrame = root.CFrame * CFrame.new(0, 3.8 * s, 0),
 		Color = c:Lerp(Color3.new(1, 1, 1), 0.15),
 	})
+	head.Material = style.Material
 	-- глаза (спящие — тёмные)
 	local eyeL = B.Neon(m, {
 		Size = Vector3.new(0.6 * s, 0.3 * s, 0.3 * s),
@@ -66,6 +80,38 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 		CFrame = head.CFrame * CFrame.new(0.8 * s, 0.3 * s, -1.35 * s),
 		Color = Color3.fromRGB(40, 40, 50),
 	})
+	-- рот
+	B.Part(m, {
+		Size = Vector3.new(1.4 * s, 0.4 * s, 0.3 * s),
+		CFrame = head.CFrame * CFrame.new(0, -0.7 * s, -1.32 * s),
+		Color = Color3.fromRGB(25, 20, 25),
+		CanCollide = false,
+	})
+	-- брови
+	B.Part(m, {
+		Size = Vector3.new(0.9 * s, 0.25 * s, 0.25 * s),
+		CFrame = head.CFrame * CFrame.new(-0.8 * s, 0.75 * s, -1.35 * s) * CFrame.Angles(0, 0, math.rad(-15)),
+		Color = Color3.fromRGB(25, 20, 25),
+		CanCollide = false,
+	})
+	B.Part(m, {
+		Size = Vector3.new(0.9 * s, 0.25 * s, 0.25 * s),
+		CFrame = head.CFrame * CFrame.new(0.8 * s, 0.75 * s, -1.35 * s) * CFrame.Angles(0, 0, math.rad(15)),
+		Color = Color3.fromRGB(25, 20, 25),
+		CanCollide = false,
+	})
+	-- рога (с 3-й зоны)
+	if zoneId >= 3 then
+		for _, sx in ipairs({ -1.1, 1.1 }) do
+			local horn = B.Wedge(m, {
+				Size = Vector3.new(0.7 * s, 1.4 * s, 0.7 * s),
+				CFrame = head.CFrame * CFrame.new(sx * s, 2 * s, 0) * CFrame.Angles(0, if sx < 0 then math.rad(-90) else math.rad(90), 0),
+				Color = c:Lerp(Color3.new(1, 1, 1), 0.4),
+				CanCollide = false,
+			})
+			horn.Material = Enum.Material.Marble
+		end
+	end
 	-- руки
 	B.Part(m, {
 		Size = Vector3.new(1.2 * s, 4 * s, 1.2 * s),
@@ -77,6 +123,15 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 		CFrame = root.CFrame * CFrame.new(2.6 * s, -0.3 * s, 0),
 		Color = c:Lerp(Color3.new(0, 0, 0), 0.15),
 	})
+	-- кулаки
+	for _, sx in ipairs({ -2.6, 2.6 }) do
+		local fist = B.Part(m, {
+			Size = Vector3.new(1.6 * s, 1.6 * s, 1.6 * s),
+			CFrame = root.CFrame * CFrame.new(sx * s, -2.4 * s, 0),
+			Color = c:Lerp(Color3.new(1, 1, 1), 0.2),
+		})
+		fist.Material = style.Material
+	end
 	-- ноги
 	B.Part(m, {
 		Size = Vector3.new(1.4 * s, 2 * s, 1.4 * s),
@@ -88,6 +143,18 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 		CFrame = root.CFrame * CFrame.new(1.1 * s, -3.4 * s, 0),
 		Color = c:Lerp(Color3.new(0, 0, 0), 0.25),
 	})
+	-- шипы на спине (с 5-й зоны)
+	if zoneId >= 5 then
+		for i = -1, 1 do
+			local spike = B.Wedge(m, {
+				Size = Vector3.new(0.8 * s, 1.6 * s, 0.8 * s),
+				CFrame = root.CFrame * CFrame.new(i * 1.2 * s, 2 * s, 1.6 * s) * CFrame.Angles(math.rad(-30), 0, 0),
+				Color = c:Lerp(Color3.new(1, 1, 1), 0.3),
+				CanCollide = false,
+			})
+			spike.Material = Enum.Material.Marble
+		end
+	end
 	-- корона для финального
 	if zone.BossScale >= 3 then
 		local crown = B.Neon(m, {
@@ -108,23 +175,92 @@ local function buildBoss(parent: Instance, zone: any, pos: Vector3): (Model, Bas
 	return m, root, eyeL, eyeR
 end
 
--- Яйцо-семя -----------------------------------------------------------------------
+-- Яйцо-семя (уникальное для каждой зоны) ------------------------------------------
 local function buildEgg(parent: Instance, zone: any, pos: Vector3, zoneId: number): BasePart
 	local B = ctx.Build
-	-- пьедестал
-	B.Part(parent, {
-		Size = Vector3.new(3, 1.6, 3),
+	local style = ZONE_STYLE[zoneId]
+	-- пьедестал в цвет зоны
+	local ped = B.Part(parent, {
+		Size = Vector3.new(3.2, 1.6, 3.2),
 		CFrame = CFrame.new(pos + Vector3.new(0, 0.8, 0)),
 		Color = Color3.fromRGB(60, 60, 70),
 		Material = Enum.Material.Marble,
 	})
-	local egg = B.Neon(parent, {
-		Size = Vector3.new(1.6, 2, 1.6),
-		CFrame = CFrame.new(pos + Vector3.new(0, 2.6, 0)),
+	B.Neon(parent, {
+		Size = Vector3.new(3.4, 0.3, 3.4),
+		CFrame = CFrame.new(pos + Vector3.new(0, 1.7, 0)),
+		Color = zone.Color,
+		CanCollide = false,
+	})
+
+	-- размер яйца растёт с редкостью
+	local es = 1.3 + zoneId * 0.18
+	local egg = B.Part(parent, {
+		Size = Vector3.new(es, es * 1.25, es),
+		CFrame = CFrame.new(pos + Vector3.new(0, 2 + es * 0.6, 0)),
 		Color = zone.Color,
 		Shape = Enum.PartType.Ball,
 		Name = "SeedEgg" .. zoneId,
 	})
+	egg.Material = style.Material
+
+	-- уникальные украшения по зонам
+	if zoneId == 2 then
+		-- листики
+		for _, a in ipairs({ -40, 40 }) do
+			B.Wedge(parent, {
+				Size = Vector3.new(0.5, 1, 0.5),
+				CFrame = egg.CFrame * CFrame.new(0, es * 0.7, 0) * CFrame.Angles(0, 0, math.rad(a)),
+				Color = Color3.fromRGB(40, 140, 40),
+				CanCollide = false,
+			})
+		end
+	elseif zoneId == 3 then
+		-- ледяные осколки вокруг
+		for i = 0, 2 do
+			local ang = math.rad(i * 120)
+			local shard = B.Wedge(parent, {
+				Size = Vector3.new(0.4, 1.2, 0.4),
+				CFrame = CFrame.new(pos + Vector3.new(math.cos(ang) * es, 2.6, math.sin(ang) * es)),
+				Color = Color3.fromRGB(180, 240, 255),
+				CanCollide = false,
+			})
+			shard.Material = Enum.Material.Ice
+		end
+	elseif zoneId == 4 then
+		-- тёмное кольцо
+		B.Part(parent, {
+			Size = Vector3.new(es + 0.4, 0.3, es + 0.4),
+			CFrame = egg.CFrame,
+			Color = Color3.fromRGB(30, 10, 35),
+			CanCollide = false,
+		})
+	elseif zoneId == 5 then
+		-- золотое сияние
+		B.Light(egg, Color3.fromRGB(255, 220, 100), 10, 1.5)
+	elseif zoneId == 6 then
+		-- шипы
+		for i = 0, 3 do
+			local ang = math.rad(i * 90)
+			local spike = B.Wedge(parent, {
+				Size = Vector3.new(0.4, 1, 0.4),
+				CFrame = egg.CFrame * CFrame.new(math.cos(ang) * es * 0.55, 0, math.sin(ang) * es * 0.55),
+				Color = Color3.fromRGB(60, 10, 10),
+				CanCollide = false,
+			})
+			spike.Material = Enum.Material.CrackedLava
+		end
+	elseif zoneId == 7 then
+		-- корона яйца и свет
+		B.Neon(parent, {
+			Size = Vector3.new(es * 0.9, 0.35, es * 0.9),
+			CFrame = egg.CFrame * CFrame.new(0, es * 0.7, 0),
+			Color = Color3.fromRGB(255, 215, 0),
+			CanCollide = false,
+		})
+		B.Light(egg, zone.Color, 12, 1.5)
+	end
+
 	B.Sparkles(egg, zone.Color)
 	B.Billboard(egg, string.format("🥚 %s · %d💰/с", zone.Name, zone.Income), zone.Color, 2.2)
 
@@ -189,12 +325,30 @@ function BossService.TrySteal(player: Player, zoneId: number, egg: BasePart?)
 	zs.EggRespawnAt = os.clock() + Config.SeedRespawn
 	carried[player] = zoneId
 
-	-- маркер над головой
+	-- маркер над головой + яйцо в руке
 	local char = player.Character
 	local head = char and char:FindFirstChild("Head")
 	if head then
 		local bb = ctx.Build.Billboard(head, "🥚 НЕСЁТ СЕМЯ!", Color3.fromRGB(255, 230, 120), 2.5)
 		carryMarker[player] = bb
+	end
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		local carryEgg = Instance.new("Part")
+		carryEgg.Name = "CarriedEgg"
+		carryEgg.Shape = Enum.PartType.Ball
+		carryEgg.Size = Vector3.new(1.1, 1.35, 1.1)
+		carryEgg.Color = zs.Zone.Color
+		carryEgg.Material = Enum.Material.Neon
+		carryEgg.CanCollide = false
+		carryEgg.Massless = true
+		carryEgg.CFrame = root.CFrame * CFrame.new(1.3, 0.6, -0.4)
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = carryEgg
+		weld.Parent = carryEgg
+		carryEgg.Parent = char
+		carryEggVisual[player] = carryEgg
 	end
 
 	-- разбудить босса
@@ -217,6 +371,11 @@ local function clearCarry(player: Player)
 	if m then
 		m:Destroy()
 		carryMarker[player] = nil
+	end
+	local egg = carryEggVisual[player]
+	if egg then
+		egg:Destroy()
+		carryEggVisual[player] = nil
 	end
 end
 
@@ -283,7 +442,7 @@ local function buildZones()
 		local x = Config.TrackCenterX
 		-- босс за семенами
 		local bossPos = Vector3.new(x, 4, zone.Z + 22)
-		local model, root, eyeL, eyeR = buildBoss(folder, zone, bossPos)
+		local model, root, eyeL, eyeR = buildBoss(folder, zone, id, bossPos)
 		-- имя босса над головой
 		ctx.Build.Billboard(root, zone.BossName .. " · 💪" .. zone.ReqStrength .. "+", Color3.fromRGB(255, 120, 120), 8 * zone.BossScale)
 
@@ -341,7 +500,7 @@ local function startChaseLoop()
 				local hum = char and char:FindFirstChildOfClass("Humanoid")
 				local invalid = (not hrp) or (not hum) or hum.Health <= 0 or (not carried[player])
 
-				-- сбежал в безопасную зону
+				-- сбежал в безопасную зону (пересёк красную линию к зелёной территории)
 				if not invalid and hrp.Position.Z < ctx.Config.SafeZoneZ then
 					resolveChase(zs, false)
 				elseif invalid then
@@ -356,11 +515,19 @@ local function startChaseLoop()
 					local dist = dir.Magnitude
 					if dist < ctx.Config.CatchRadius then
 						resolveChase(zs, true)
+					elseif dist > ctx.Config.EscapeDistance then
+						-- игрок оторвался — побег засчитан
+						resolveChase(zs, false)
 					else
 						dir = dir.Unit
 						local step = math.min(zs.Zone.BossSpeed * dt, dist)
 						local newPos = pos + dir * step
-						newPos = Vector3.new(newPos.X, zs.Home.Y + math.sin(bob * 8) * 0.4, newPos.Z)
+						-- босс не пересекает границы своей локации
+						local minZ = zs.Zone.Z - ctx.Config.BossLeashHalfZ
+						local maxZ = zs.Zone.Z + ctx.Config.BossLeashHalfZ
+						local clampedX = math.clamp(newPos.X, ctx.Config.TrackMinX, ctx.Config.TrackMaxX)
+						local clampedZ = math.clamp(newPos.Z, minZ, maxZ)
+						newPos = Vector3.new(clampedX, zs.Home.Y + math.sin(bob * 8) * 0.4, clampedZ)
 						zs.Boss:PivotTo(CFrame.lookAt(newPos, Vector3.new(target.X, newPos.Y, target.Z)))
 					end
 				end
