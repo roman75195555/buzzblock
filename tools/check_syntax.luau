@@ -7,13 +7,10 @@ local files = {
 	"src/ReplicatedStorage/Modules/Config.lua",
 	"src/ServerScriptService/Main.server.lua",
 	"src/ServerScriptService/DataService.lua",
-	"src/ServerScriptService/EconomyService.lua",
+	"src/ServerScriptService/WorldService.lua",
 	"src/ServerScriptService/BaseService.lua",
-	"src/ServerScriptService/BossService.lua",
-	"src/ServerScriptService/ShopService.lua",
 	"src/StarterPlayerScripts/ClientMain.client.lua",
 	"src/StarterPlayerScripts/UI/HUD.lua",
-	"src/StarterPlayerScripts/UI/ShopUI.lua",
 }
 
 local failed = 0

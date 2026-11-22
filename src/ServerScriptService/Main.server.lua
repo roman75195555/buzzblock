@@ -1,7 +1,7 @@
 --!strict
 --==============================================================================
--- SeedRush :: Main
--- Точка входа сервера: создаёт remotes, загружает и запускает сервисы.
+-- LunarBase :: Main
+-- Точка входа сервера: remotes, загрузка и запуск сервисов.
 --==============================================================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,9 +9,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 
--- Remotes -------------------------------------------------------------------
 local remotes = Instance.new("Folder")
-remotes.Name = "RushRemotes"
+remotes.Name = "LunarRemotes"
 
 local function remoteEvent(name: string): RemoteEvent
 	local r = Instance.new("RemoteEvent")
@@ -28,16 +27,13 @@ local function remoteFunction(name: string): RemoteFunction
 end
 
 local Remotes = {
-	GetState     = remoteFunction("GetState"),   -- клиент запрашивает полный профиль
-	BuyUpgrade   = remoteEvent("BuyUpgrade"),    -- (kind: "treadmill" | "trainer" | "trail:N")
-	Notify       = remoteEvent("Notify"),        -- сервер -> клиент: тост (text, colorName)
-	StateChanged = remoteEvent("StateChanged"),  -- сервер -> клиент: обновление профиля
-	OpenShop     = remoteEvent("OpenShop"),      -- сервер -> клиент: открыть магазин
+	GetState     = remoteFunction("GetState"),
+	Notify       = remoteEvent("Notify"),
+	StateChanged = remoteEvent("StateChanged"),
 	Folder       = remotes,
 }
 remotes.Parent = ReplicatedStorage
 
--- Контекст, общий для всех сервисов ------------------------------------------
 local ctx = {
 	Config = require(Modules.Config),
 	Build = require(Modules.BuildUtil),
@@ -47,10 +43,8 @@ local ctx = {
 
 local serviceOrder = {
 	"DataService",
-	"EconomyService",
+	"WorldService",
 	"BaseService",
-	"BossService",
-	"ShopService",
 }
 
 for _, name in ipairs(serviceOrder) do
@@ -71,4 +65,4 @@ for _, name in ipairs(serviceOrder) do
 	end
 end
 
-print("[SeedRush] Сервер запущен. Сервисов: " .. #serviceOrder)
+print("[LunarBase] Сервер запущен. Сервисов: " .. #serviceOrder)

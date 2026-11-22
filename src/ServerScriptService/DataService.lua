@@ -1,6 +1,6 @@
 --!strict
 --==============================================================================
--- SeedRush :: DataService
+-- LunarBase :: DataService
 -- Профили игроков: DataStore, автосохранение, сохранение при выходе.
 --==============================================================================
 
@@ -12,20 +12,13 @@ local DataService = {}
 local ctx
 local store
 
-local STORE_NAME = "SeedRush_v1"
 local profiles: { [Player]: any } = {}
 
--- Шаблон нового профиля -------------------------------------------------------
 local function defaultData(Config)
 	return {
 		Money = Config.StartMoney,
-		Speed = 0,          -- очки скорости (влияют на WalkSpeed)
-		Strength = 0,       -- сила (гейт кражи семян)
-		TreadmillTier = 1,  -- тир беговой дорожки
-		TrainerTier = 1,    -- тир тренажёра силы
-		Trails = {},        -- trailId -> true
-		Seeds = {},         -- zoneId(string) -> количество
-		Plots = {},         -- slotIndex(string) -> { Zone = n, PlantedAt = os.time() }
+		Terminal = 0,        -- накоплено на терминале (нужно забрать)
+		Purchases = {},      -- upgradeId -> true
 	}
 end
 
@@ -33,19 +26,14 @@ local function key(player: Player): string
 	return "player_" .. player.UserId
 end
 
--- API ------------------------------------------------------------------------
 function DataService.Get(player: Player)
 	return profiles[player]
-end
-
-function DataService.IsLoaded(player: Player): boolean
-	return profiles[player] ~= nil
 end
 
 function DataService.Save(player: Player)
 	local data = profiles[player]
 	if not data then return end
-	if not store then return end -- Studio без API-доступа
+	if not store then return end
 	local ok, err = pcall(function()
 		store:SetAsync(key(player), data)
 	end)
@@ -62,13 +50,26 @@ local function pushState(player: Player)
 end
 DataService.PushState = pushState
 
+local function syncLeaderstats(player: Player)
+	local data = profiles[player]
+	local ls = player:FindFirstChild("leaderstats")
+	local coins = ls and ls:FindFirstChild("Кредиты")
+	if data and coins then
+		coins.Value = math.floor(data.Money)
+	end
+end
+
 function DataService.AddMoney(player: Player, amount: number)
 	local data = profiles[player]
 	if not data then return end
-	data.Money = math.max(0, math.round(data.Money + amount))
-	local ls = player:FindFirstChild("leaderstats")
-	local coins = ls and ls:FindFirstChild("Монеты")
-	if coins then coins.Value = data.Money end
+	data.Money = math.max(0, data.Money + amount)
+	syncLeaderstats(player)
+end
+
+function DataService.AddTerminal(player: Player, amount: number)
+	local data = profiles[player]
+	if not data then return end
+	data.Terminal = math.max(0, data.Terminal + amount)
 end
 
 function DataService.TrySpend(player: Player, amount: number): boolean
@@ -79,12 +80,11 @@ function DataService.TrySpend(player: Player, amount: number): boolean
 	return true
 end
 
--- Загрузка --------------------------------------------------------------------
 local function onPlayerAdded(player: Player)
 	local ls = Instance.new("Folder")
 	ls.Name = "leaderstats"
 	local coins = Instance.new("IntValue")
-	coins.Name = "Монеты"
+	coins.Name = "Кредиты"
 	coins.Value = 0
 	coins.Parent = ls
 	ls.Parent = player
@@ -104,7 +104,7 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 	profiles[player] = data
-	coins.Value = data.Money
+	syncLeaderstats(player)
 
 	task.defer(function()
 		task.wait(1)
@@ -117,11 +117,10 @@ local function onPlayerRemoving(player: Player)
 	profiles[player] = nil
 end
 
--- Жизненный цикл ---------------------------------------------------------------
 function DataService.Init(c)
 	ctx = c
 	local ok, s = pcall(function()
-		return DataStoreService:GetDataStore(STORE_NAME)
+		return DataStoreService:GetDataStore(ctx.Config.StoreName)
 	end)
 	if ok then
 		store = s

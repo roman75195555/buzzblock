@@ -1,5 +1,5 @@
 {
-  "name": "SeedRush",
+  "name": "LunarBase",
   "globIgnorePaths": ["**/.DS_Store", "**/*.md"],
   "tree": {
     "$className": "DataModel",
@@ -21,74 +21,57 @@
         "$path": "src/StarterPlayerScripts"
       },
       "$properties": {
-        "CameraMaxZoomDistance": 150,
+        "CameraMaxZoomDistance": 200,
         "CameraMinZoomDistance": 8,
         "CharacterUseJumpPower": true,
-        "CharacterJumpPower": 55,
+        "CharacterJumpPower": 50,
         "CharacterWalkSpeed": 16
-      }
-    },
-
-    "StarterPack": {
-      "$className": "StarterPack",
-      "Dumbbell": {
-        "$path": "assets/DumbbellTool.rbxm"
       }
     },
 
     "Workspace": {
       "$className": "Workspace",
       "$properties": {
-        "Gravity": 196.2,
+        "Gravity": 32,
         "StreamingEnabled": false
-      },
-      "Map": {
-        "$path": "assets/Map.rbxm"
       }
     },
 
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
-        "Ambient": [0.35, 0.35, 0.38],
-        "OutdoorAmbient": [0.45, 0.47, 0.5],
+        "Ambient": [0.32, 0.33, 0.38],
+        "OutdoorAmbient": [0.38, 0.4, 0.45],
         "Brightness": 2,
-        "ClockTime": 14,
-        "GeographicLatitude": 35,
+        "ClockTime": 0,
         "GlobalShadows": true,
-        "Technology": "Future"
+        "Technology": "Future",
+        "FogColor": [0.02, 0.02, 0.04],
+        "FogStart": 600,
+        "FogEnd": 2500
       },
       "Sky": {
         "$className": "Sky",
         "$properties": {
           "CelestialBodiesShown": true,
-          "SunAngularSize": 11
-        }
-      },
-      "Atmosphere": {
-        "$className": "Atmosphere",
-        "$properties": {
-          "Density": 0.3,
-          "Offset": 0.25,
-          "Color": [0.75, 0.82, 0.9],
-          "Decay": [0.9, 0.9, 0.95],
-          "Glare": 0.2,
-          "Haze": 1.5
+          "StarCount": 5000,
+          "MoonAngularSize": 0,
+          "SunAngularSize": 0
         }
       },
       "Bloom": {
         "$className": "BloomEffect",
         "$properties": {
-          "Intensity": 0.6,
+          "Intensity": 0.7,
           "Size": 24,
-          "Threshold": 1.4
+          "Threshold": 1.3
         }
       },
-      "SunRays": {
-        "$className": "SunRaysEffect",
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
         "$properties": {
-          "Intensity": 0.08,
-          "Spread": 0.8
+          "Contrast": 0.08,
+          "Saturation": -0.15
         }
       }
     },
