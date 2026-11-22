@@ -119,6 +119,9 @@ function HUD.Init(deps)
 	local fuelText = label(fuelFrame, "⛽", UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), 18)
 	fuelText.ZIndex = 3
 	fuelText.BackgroundTransparency = 1
+	-- подсказка управления лодкой
+	local driveHint = label(gui, "R — вверх · F — вниз · Space — выйти", UDim2.new(0, 340, 0, 24), UDim2.new(0.5, -170, 1, -46), 16)
+	driveHint.Visible = false
 
 	-- Кнопки всплытия/погружения ------------------------------------------------------
 	local upBtn = button(gui, "▲", UDim2.new(0, 70, 0, 70), UDim2.new(1, -96, 1, -240), Color3.fromRGB(90, 210, 230))
@@ -224,6 +227,7 @@ function HUD.Init(deps)
 		fuelFrame.Visible = driving
 		upBtn.Visible = driving
 		downBtn.Visible = driving
+		driveHint.Visible = driving
 	end
 
 	function api.UpdateFuel(fuel: number, maxFuel: number)

@@ -18,6 +18,9 @@ WorldService.DockCF = CFrame.new(0, -44, 0) -- подводный док
 WorldService.PortalSurface = nil  -- кольцо-портал на поверхности
 WorldService.PortalUnder = nil    -- кольцо-портал под водой
 
+-- общий кулдаун телепортов (чтобы площадки не «пинг-понговали» игрока)
+local teleDebounce: { [Player]: number } = {}
+
 -- Хелперы ---------------------------------------------------------------------
 local function cyl(parent, cf: CFrame, height: number, diameter: number, color: Color3, material: Enum.Material?)
 	return ctx.Build.Part(parent, {
@@ -29,13 +32,10 @@ local function cyl(parent, cf: CFrame, height: number, diameter: number, color: 
 end
 
 local function island(parent: Instance, pos: Vector3, radius: number)
-	local P = ctx.Build
 	local pal = ctx.Config.Palette
-	-- слои острова
 	cyl(parent, CFrame.new(pos + Vector3.new(0, -6, 0)), 12, radius * 2.15, pal.Sand)
 	cyl(parent, CFrame.new(pos + Vector3.new(0, 0.5, 0)), 3, radius * 2.0, pal.Earth)
 	local top = cyl(parent, CFrame.new(pos + Vector3.new(0, 1.6, 0)), 2.4, radius * 1.92, pal.Grass)
-	-- песчаный пляж-кольцо
 	cyl(parent, CFrame.new(pos + Vector3.new(0, 1.2, 0)), 2.6, radius * 2.1, pal.Sand)
 	top.Name = "IslandTop"
 	return top
@@ -60,7 +60,6 @@ local function coral(parent: Instance, cf: CFrame, color: Color3, scale: number)
 				* CFrame.new(0, bh / 2, 0),
 			Color = color,
 		})
-		-- светящийся кончик
 		P.Neon(m, {
 			Size = Vector3.new(1.3 * scale, 1.3 * scale, 1.3 * scale),
 			CFrame = b.CFrame * CFrame.new(0, bh / 2, 0),
@@ -116,7 +115,6 @@ local function cave(parent: Instance, cf: CFrame)
 	local pal = ctx.Config.Palette
 	local m = Instance.new("Model")
 	m.Name = "Cave"
-	-- колонны
 	for side = -1, 1, 2 do
 		for i = 1, 3 do
 			P.Part(m, {
@@ -126,7 +124,6 @@ local function cave(parent: Instance, cf: CFrame)
 			})
 		end
 	end
-	-- свод
 	for i = 1, 4 do
 		P.Part(m, {
 			Size = Vector3.new(30 - i * 2, 5, 8 - i),
@@ -134,7 +131,6 @@ local function cave(parent: Instance, cf: CFrame)
 			Color = pal.StoneDark, Material = Enum.Material.Slate,
 		})
 	end
-	-- кристаллы внутри
 	for i = 1, 4 do
 		local c = P.Neon(m, {
 			Size = Vector3.new(1.6, 4 + math.random() * 3, 1.6),
@@ -163,7 +159,6 @@ local function portalRing(parent: Instance, cf: CFrame, radius: number, color: C
 			Color = color, Shape = Enum.PartType.Ball, CanCollide = false,
 		})
 	end
-	-- зона срабатывания
 	local zone = P.Part(m, {
 		Size = Vector3.new(radius * 1.7, radius * 1.7, 6),
 		CFrame = cf, Transparency = 1, CanCollide = false, Name = "PortalZone",
@@ -188,18 +183,15 @@ local function buildShop(parent: Instance, cf: CFrame)
 	local m = Instance.new("Model")
 	m.Name = "Shop"
 
-	-- пол и стены
 	P.Part(m, { Size = Vector3.new(28, 1.4, 22), CFrame = cf * CFrame.new(0, 0.7, 0), Color = pal.WoodDark })
-	P.Part(m, { Size = Vector3.new(28, 12, 1.6), CFrame = cf * CFrame.new(0, 6, -10.2), Color = pal.Wood })      -- задняя
-	P.Part(m, { Size = Vector3.new(1.6, 12, 22), CFrame = cf * CFrame.new(-13.2, 6, 0), Color = pal.Wood })      -- левая
-	P.Part(m, { Size = Vector3.new(1.6, 12, 22), CFrame = cf * CFrame.new(13.2, 6, 0), Color = pal.Wood })       -- правая
-	-- угловые балки
+	P.Part(m, { Size = Vector3.new(28, 12, 1.6), CFrame = cf * CFrame.new(0, 6, -10.2), Color = pal.Wood })
+	P.Part(m, { Size = Vector3.new(1.6, 12, 22), CFrame = cf * CFrame.new(-13.2, 6, 0), Color = pal.Wood })
+	P.Part(m, { Size = Vector3.new(1.6, 12, 22), CFrame = cf * CFrame.new(13.2, 6, 0), Color = pal.Wood })
 	for sx = -1, 1, 2 do
 		for sz = -1, 1, 2 do
 			P.Part(m, { Size = Vector3.new(2.2, 13, 2.2), CFrame = cf * CFrame.new(sx * 13.2, 6.5, sz * 10.2), Color = pal.WoodDark })
 		end
 	end
-	-- крыша (два ската из клиньев)
 	P.Wedge(m, { Size = Vector3.new(30, 7, 12), CFrame = cf * CFrame.new(0, 15.5, -5.5), Color = pal.Red })
 	P.Wedge(m, { Size = Vector3.new(30, 7, 12), CFrame = cf * CFrame.new(0, 15.5, 5.5) * CFrame.Angles(0, math.rad(180), 0), Color = pal.Red })
 	P.Part(m, { Size = Vector3.new(30, 1.4, 2.4), CFrame = cf * CFrame.new(0, 19.4, 0), Color = pal.WoodDark })
@@ -207,22 +199,19 @@ local function buildShop(parent: Instance, cf: CFrame)
 	-- прилавок
 	P.Part(m, { Size = Vector3.new(16, 3.4, 3), CFrame = cf * CFrame.new(0, 2.4, -4), Color = pal.WoodDark })
 	P.Part(m, { Size = Vector3.new(17, 0.8, 3.6), CFrame = cf * CFrame.new(0, 4.4, -4), Color = pal.Wood })
-	-- витрина: мини-винт и шестерёнка
 	local gear = P.Part(m, { Size = Vector3.new(0.8, 3, 3), CFrame = cf * CFrame.new(-4, 6.4, -4) * CFrame.Angles(0, 0, math.rad(90)), Color = pal.Yellow, Shape = Enum.PartType.Cylinder })
 	ctx.Build.Sparkles(gear)
 	P.Part(m, { Size = Vector3.new(3, 0.8, 1.2), CFrame = cf * CFrame.new(4, 5.6, -4), Color = pal.Stone })
 	P.Part(m, { Size = Vector3.new(1.2, 0.8, 3), CFrame = cf * CFrame.new(4, 5.6, -4), Color = pal.Stone })
 
-	-- вывеска
+	-- вывеска (фиксированная, не поворачивается к игроку)
 	local sign = P.Part(m, { Size = Vector3.new(14, 4, 0.8), CFrame = cf * CFrame.new(0, 13.5, 11.2), Color = pal.Yellow })
-	ctx.Build.Billboard(sign, "🛒 МАГАЗИН", pal.Black, 0.5, 30)
-	-- фонари
+	ctx.Build.SignText(sign, "🛒 МАГАЗИН", pal.Black)
 	for sx = -1, 1, 2 do
 		local lamp = P.Neon(m, { Size = Vector3.new(1.4, 1.4, 1.4), CFrame = cf * CFrame.new(sx * 12, 11, 10.5), Color = pal.Yellow, Shape = Enum.PartType.Ball })
 		P.Light(lamp, pal.Yellow, 18, 1.4)
 	end
 
-	-- промпт открытия магазина
 	local promptPart = P.Part(m, { Size = Vector3.new(10, 1, 6), CFrame = cf * CFrame.new(0, 1.6, 6), Transparency = 1, CanCollide = false, Name = "ShopZone" })
 	local pp = ctx.Build.Prompt(promptPart, "Открыть", "Магазин деталей")
 	pp.Triggered:Connect(function(player)
@@ -240,32 +229,56 @@ local function beeStatue(parent: Instance, cf: CFrame)
 	local pal = ctx.Config.Palette
 	local m = Instance.new("Model")
 	m.Name = "BeeStatue"
+
 	-- постамент
-	P.Part(m, { Size = Vector3.new(14, 2, 14), CFrame = cf * CFrame.new(0, 1, 0), Color = pal.Stone })
+	local base1 = P.Part(m, { Size = Vector3.new(14, 2, 14), CFrame = cf * CFrame.new(0, 1, 0), Color = pal.Stone })
 	P.Part(m, { Size = Vector3.new(11, 2, 11), CFrame = cf * CFrame.new(0, 3, 0), Color = pal.StoneDark })
-	local base = cf * CFrame.new(0, 8, 0)
-	-- тело
-	P.Part(m, { Size = Vector3.new(6, 5, 9), CFrame = base, Color = pal.BeeYellow, Shape = Enum.PartType.Ball })
-	P.Part(m, { Size = Vector3.new(6.2, 5.2, 2), CFrame = base * CFrame.new(0, 0, -1), Color = pal.Black })
-	P.Part(m, { Size = Vector3.new(6.2, 5.2, 2), CFrame = base * CFrame.new(0, 0, 2), Color = pal.Black })
-	-- голова
-	P.Part(m, { Size = Vector3.new(4, 4, 4), CFrame = base * CFrame.new(0, 1, 5.6), Color = pal.BeeYellow, Shape = Enum.PartType.Ball })
+	P.SignText(base1, "🐝 BuzzBlocks", pal.Yellow)
+
+	-- тело (мяч) + полосы-кольца
+	local bodyCF = cf * CFrame.new(0, 8.5, 0)
+	P.Part(m, { Size = Vector3.new(6.5, 5.8, 5.8), CFrame = bodyCF, Color = pal.BeeYellow, Shape = Enum.PartType.Ball })
+	for sx = -1, 1, 2 do
+		P.Part(m, {
+			Size = Vector3.new(1.4, 6, 6),
+			CFrame = bodyCF * CFrame.new(sx * 1.6, 0, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = pal.Black, Shape = Enum.PartType.Cylinder,
+		})
+	end
+	-- голова спереди
+	P.Part(m, { Size = Vector3.new(3.8, 3.8, 3.8), CFrame = bodyCF * CFrame.new(0, 0.6, 3.6), Color = pal.BeeYellow, Shape = Enum.PartType.Ball })
 	-- глаза
 	for sx = -1, 1, 2 do
-		P.Neon(m, { Size = Vector3.new(0.9, 0.9, 0.9), CFrame = base * CFrame.new(sx * 1.1, 1.6, 7.4), Color = pal.Black, Shape = Enum.PartType.Ball })
+		P.Neon(m, { Size = Vector3.new(0.8, 0.8, 0.8), CFrame = bodyCF * CFrame.new(sx * 1, 1.2, 5.1), Color = pal.Black, Shape = Enum.PartType.Ball })
+	end
+	-- усики
+	for sx = -1, 1, 2 do
+		P.Part(m, { Size = Vector3.new(0.25, 2, 0.25), CFrame = bodyCF * CFrame.new(sx * 0.9, 3.6, 3.4) * CFrame.Angles(math.rad(-20), 0, sx * math.rad(15)), Color = pal.Black })
+		P.Neon(m, { Size = Vector3.new(0.5, 0.5, 0.5), CFrame = bodyCF * CFrame.new(sx * 1.2, 4.6, 3.7), Color = pal.BeeYellow, Shape = Enum.PartType.Ball })
 	end
 	-- крылья
 	for sx = -1, 1, 2 do
 		P.Part(m, {
-			Size = Vector3.new(0.4, 4.5, 6), CFrame = base * CFrame.new(sx * 2.4, 4.6, -0.5) * CFrame.Angles(0, 0, sx * math.rad(35)),
+			Size = Vector3.new(0.35, 5, 6.5), CFrame = bodyCF * CFrame.new(sx * 2.2, 5.2, -0.6) * CFrame.Angles(0, 0, sx * math.rad(32)),
 			Color = pal.White, Transparency = 0.35, Material = Enum.Material.Glass,
 		})
 	end
+	-- лапки
+	for i = 0, 2 do
+		for sx = -1, 1, 2 do
+			P.Part(m, { Size = Vector3.new(0.5, 1.6, 0.5), CFrame = bodyCF * CFrame.new((i - 1) * 1.8, -3.4, sx * 1.6), Color = pal.Black })
+		end
+	end
 	-- жало
-	P.Wedge(m, { Size = Vector3.new(2, 2, 3), CFrame = base * CFrame.new(0, 0, -6) * CFrame.Angles(0, math.rad(-90), 0), Color = pal.Black })
-	local crown = P.Neon(m, { Size = Vector3.new(2.4, 1.6, 2.4), CFrame = base * CFrame.new(0, 6.6, 0), Color = pal.Yellow, Shape = Enum.PartType.Cylinder })
+	P.Wedge(m, { Size = Vector3.new(1.6, 1.6, 2.4), CFrame = bodyCF * CFrame.new(0, -0.4, -3.8) * CFrame.Angles(0, math.rad(-90), 0), Color = pal.Black })
+	-- корона
+	local crown = P.Neon(m, { Size = Vector3.new(2.6, 1.2, 2.6), CFrame = bodyCF * CFrame.new(0, 3.6, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = pal.Yellow, Shape = Enum.PartType.Cylinder })
+	for i = 0, 4 do
+		local a = math.rad(i * 72)
+		P.Neon(m, { Size = Vector3.new(0.5, 1, 0.5), CFrame = bodyCF * CFrame.new(0, 4.2, 0) * CFrame.Angles(0, a, 0) * CFrame.new(1.1, 0.5, 0), Color = pal.Yellow })
+	end
 	P.Light(crown, pal.Yellow, 20, 1.5)
-	ctx.Build.Billboard(crown, "🐝 BuzzBlocks", pal.Yellow, 5, 34)
+
 	m.PrimaryPart = crown
 	m.Parent = parent
 	return m
@@ -282,35 +295,34 @@ local function buildWorld()
 
 	-- Вода ----------------------------------------------------------------------
 	Build.Part(worldFolder, {
-		Size = Vector3.new(1600, 2, 1600),
+		Size = Vector3.new(2400, 2, 2400),
 		CFrame = CFrame.new(0, Config.SeaLevel - 1, 0),
 		Color = Color3.fromRGB(40, 130, 200), Material = Enum.Material.Glass,
 		Transparency = 0.35, CanCollide = false, Name = "Sea",
 	})
 	-- Дно океана
 	Build.Part(worldFolder, {
-		Size = Vector3.new(1600, 6, 1600),
+		Size = Vector3.new(2400, 6, 2400),
 		CFrame = CFrame.new(0, Config.OceanFloor - 3, 0),
 		Color = pal.Sand, Material = Enum.Material.Sand, Name = "OceanFloor",
 	})
 	-- глубокий пояс
-	cyl(worldFolder, CFrame.new(0, Config.OceanFloor + 0.6, 0), 1.2, 700, pal.SandDeep, Enum.Material.Sand)
+	cyl(worldFolder, CFrame.new(0, Config.OceanFloor + 0.6, 0), 1.2, 1600, pal.SandDeep, Enum.Material.Sand)
 
 	-- Хаб -----------------------------------------------------------------------
 	local hub = Instance.new("Model")
 	hub.Name = "Hub"
 	island(hub, Vector3.new(0, 0, 0), 42)
-	-- плаза с LEGO-studs
 	local plaza = cyl(hub, CFrame.new(0, 2.9, 0), 0.9, 56, pal.Stone)
 	Build.Studs(hub, CFrame.new(0, 3.35, 0), Vector3.new(52, 0.1, 52), pal.StoneDark, 4)
 	beeStatue(hub, CFrame.new(0, 3.2, 0))
 	buildShop(hub, CFrame.new(0, 3.2, -26))
-	-- деревья по краю хаба
 	for i = 1, 5 do
 		local a = math.rad(40 + i * 55)
 		Build.Tree(hub, CFrame.new(math.cos(a) * 34, 2.8, math.sin(a) * 34), 0.9)
 	end
 	hub.Parent = worldFolder
+	plaza.Name = "Plaza"
 
 	-- Точка появления
 	local spawn = Instance.new("SpawnLocation")
@@ -324,16 +336,15 @@ local function buildWorld()
 	spawn.BottomSurface = Enum.SurfaceType.Smooth
 	spawn.Parent = worldFolder
 
-	-- Острова под базы --------------------------------------------------------------
+	-- Острова под базы (большие) ----------------------------------------------------
 	for i = 1, Config.PlotCount do
 		local angle = (i - 1) / Config.PlotCount * math.pi * 2 + math.rad(22.5)
 		local pos = Vector3.new(math.cos(angle) * Config.BaseRadius, 0, math.sin(angle) * Config.BaseRadius)
 		local isl = Instance.new("Model")
 		isl.Name = "PlotIsland" .. i
-		island(isl, pos, 30)
-		Build.Tree(isl, CFrame.new(pos + Vector3.new(-18, 2.8, -14)), 0.7)
+		island(isl, pos, 44)
+		Build.Tree(isl, CFrame.new(pos + Vector3.new(-26, 2.8, -20)), 0.7)
 		isl.Parent = worldFolder
-		-- CFrame острова: смотрит на центр карты
 		WorldService.PlotCF[i] = CFrame.lookAt(pos + Vector3.new(0, 2.8, 0), Vector3.new(0, 2.8, 0))
 	end
 
@@ -358,9 +369,13 @@ local function buildWorld()
 			pillar.Name = "DockPillar"
 		end
 	end
+	-- указатель на зоны
+	local signPost = Build.Part(dock, { Size = Vector3.new(6, 4, 0.6), CFrame = CFrame.new(6, -40, 14) * CFrame.Angles(0, math.rad(90), 0), Color = pal.Yellow })
+	Build.SignText(signPost, "🥚 Локации с яйцами — туда ➜", pal.Black)
+	Build.Part(dock, { Size = Vector3.new(0.8, 6, 0.8), CFrame = CFrame.new(6, -44, 14), Color = pal.WoodDark })
 	dock.Parent = worldFolder
 
-	-- Подводные декорации ---------------------------------------------------------------
+	-- Подводные декорации (вне зон) ----------------------------------------------------
 	local decor = Instance.new("Folder")
 	decor.Name = "UnderwaterDecor"
 	local coralColors = { pal.Coral1, pal.Coral2, pal.Coral3, pal.Coral4 }
@@ -368,32 +383,31 @@ local function buildWorld()
 
 	for i = 1, 90 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(40, 330)
+		local r = rng:NextNumber(40, 500)
 		local pos = Vector3.new(math.cos(a) * r, Config.OceanFloor + 3, math.sin(a) * r)
 		coral(decor, CFrame.new(pos), coralColors[rng:NextInteger(1, #coralColors)], rng:NextNumber(0.7, 2.2))
 	end
 	for i = 1, 70 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(35, 320)
+		local r = rng:NextNumber(35, 480)
 		local pos = Vector3.new(math.cos(a) * r, Config.OceanFloor + 3, math.sin(a) * r)
 		seaweed(decor, CFrame.new(pos), rng:NextNumber(8, 24))
 	end
 	for i = 1, 26 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(50, 300)
+		local r = rng:NextNumber(50, 450)
 		local pos = Vector3.new(math.cos(a) * r, Config.OceanFloor + 2, math.sin(a) * r)
 		rock(decor, CFrame.new(pos), rng:NextNumber(0.8, 2.4))
 	end
 	for i = 1, 5 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(80, 260)
+		local r = rng:NextNumber(80, 400)
 		local pos = Vector3.new(math.cos(a) * r, Config.OceanFloor + 2, math.sin(a) * r)
 		cave(decor, CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
 	end
-	-- гейзеры с пузырями
 	for i = 1, 22 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(40, 310)
+		local r = rng:NextNumber(40, 480)
 		local vent = Build.Part(decor, {
 			Size = Vector3.new(3, 2, 3),
 			CFrame = CFrame.new(math.cos(a) * r, Config.OceanFloor + 4, math.sin(a) * r),
@@ -401,10 +415,9 @@ local function buildWorld()
 		})
 		Build.Bubbles(vent, 3, 0.9)
 	end
-	-- жемчужины
 	for i = 1, 12 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(50, 280)
+		local r = rng:NextNumber(50, 420)
 		local pearl = Build.Neon(decor, {
 			Size = Vector3.new(1.8, 1.8, 1.8),
 			CFrame = CFrame.new(math.cos(a) * r, Config.OceanFloor + 4.4, math.sin(a) * r),
@@ -418,7 +431,7 @@ local function buildWorld()
 	worldFolder.Parent = workspace
 end
 
--- Телепорт-площадки хаб <-> база (создаются BaseService для конкретного игрока) -----
+-- Телепорт-площадки хаб <-> база -----------------------------------------------------
 function WorldService.MakeTeleporter(fromCF: CFrame, toCF: CFrame, color: Color3, label: string, parent: Instance)
 	local Build = ctx.Build
 	local pad = Build.Neon(parent, {
@@ -431,16 +444,16 @@ function WorldService.MakeTeleporter(fromCF: CFrame, toCF: CFrame, color: Color3
 	})
 	Build.Billboard(pad, label, color, 3)
 	ring.Name = "TelePadRing"
-	local debounce = {}
 	pad.Touched:Connect(function(hit)
 		local char = hit.Parent
 		local player = char and Players:GetPlayerFromCharacter(char)
 		if not player then return end
 		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if not hrp or debounce[player] then return end
-		debounce[player] = true
+		if not hrp then return end
+		local now = os.clock()
+		if teleDebounce[player] and now - teleDebounce[player] < 2.5 then return end
+		teleDebounce[player] = now
 		hrp.CFrame = toCF * CFrame.new(0, 4, 0)
-		task.delay(1.5, function() debounce[player] = nil end)
 	end)
 	return pad
 end

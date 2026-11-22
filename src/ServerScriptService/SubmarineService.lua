@@ -190,6 +190,8 @@ local function buildSubModel(player: Player, spawnCF: CFrame)
 	model:SetAttribute("OwnerUserId", player.UserId)
 	model:SetAttribute("MaxFuel", tank.Fuel)
 	model:SetAttribute("Fuel", tank.Fuel)
+	model:SetAttribute("MaxHP", hullPart.HP)
+	model:SetAttribute("HP", hullPart.HP)
 	model.PrimaryPart = root
 	model.Parent = workspace
 
@@ -210,6 +212,17 @@ function SubmarineService.RemoveSub(player: Player)
 		sub.Model:Destroy()
 	end
 	subs[player] = nil
+end
+
+-- Разрушение подлодки монстром: убираем лодку, игрока возвращаем на базу ---------
+function SubmarineService.DestroySub(player: Player)
+	SubmarineService.RemoveSub(player)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local base = ctx.Services.BaseService.GetBase(player)
+	if hrp and base then
+		hrp.CFrame = base.PadCF * CFrame.new(0, 6, 0)
+	end
 end
 
 -- Управление -------------------------------------------------------------------

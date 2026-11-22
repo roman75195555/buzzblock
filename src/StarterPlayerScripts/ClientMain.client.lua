@@ -155,7 +155,7 @@ local function updateDriving()
 	end
 end
 
--- Space/Shift — всплытие/погружение (перехватываем, чтобы не выпрыгнуть из кресла)
+-- R/F — всплытие/погружение. Space НЕ перехватываем: он выпрыгивает из кресла.
 local function bindVertical()
 	ContextActionService:BindAction("BuzzSubUp", function(_action, inputState)
 		if not driving then
@@ -167,7 +167,7 @@ local function bindVertical()
 			subControl:FireServer(0)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.Space)
+	end, false, Enum.KeyCode.R)
 	ContextActionService:BindAction("BuzzSubDown", function(_action, inputState)
 		if not driving then
 			return Enum.ContextActionResult.Pass
@@ -178,7 +178,7 @@ local function bindVertical()
 			subControl:FireServer(0)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonB)
+	end, false, Enum.KeyCode.F, Enum.KeyCode.ButtonB)
 end
 bindVertical()
 

@@ -176,6 +176,26 @@ function BuildUtil.Billboard(parent: Instance, text: string, color: Color3?, off
 	return bb
 end
 
+-- Фиксированная надпись на поверхности детали (не поворачивается к камере)
+function BuildUtil.SignText(part: BasePart, text: string, color: Color3?, textSize: number?, face: Enum.NormalId?)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = face or Enum.NormalId.Front
+	sg.PixelsPerStud = 40
+	sg.AlwaysOnTop = false
+	local tl = Instance.new("TextLabel")
+	tl.Size = UDim2.new(1, -16, 1, -16)
+	tl.Position = UDim2.new(0, 8, 0, 8)
+	tl.BackgroundTransparency = 1
+	tl.Text = text
+	tl.Font = Enum.Font.FredokaOne
+	tl.TextScaled = true
+	tl.TextColor3 = color or Color3.new(0, 0, 0)
+	tl.TextStrokeTransparency = 0.7
+	tl.Parent = sg
+	sg.Parent = part
+	return sg
+end
+
 -- Сборка простого блочного дерева
 function BuildUtil.Tree(parent: Instance, cf: CFrame, scale: number?, leafColor: Color3?)
 	local P = BuildUtil.Part

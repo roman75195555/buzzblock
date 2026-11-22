@@ -122,6 +122,20 @@ Config.Animals = {
 }
 Config.AnimalCount = 26            -- сколько животных одновременно в океане
 
+-- Подводные зоны (по прямой вдоль +X: чем дальше, тем ценнее) ------------------
+Config.ZoneStart = 140             -- X первой зоны
+Config.ZoneSpacing = 130           -- расстояние между зонами
+Config.ZoneRadius = 55             -- радиус декора зоны
+Config.EggsPerZone = 6             -- яиц в зоне
+Config.EggRespawn = 60             -- сек до появления нового яйца
+Config.MonsterBaseSpeed = 18       -- скорость погони монстра зоны 1
+Config.MonsterSpeedPerZone = 2.5   -- +скорость за каждую следующую зону
+Config.MonsterBaseDamage = 8       -- урон монстра зоны 1 по подлодке
+Config.MonsterDamagePerZone = 4    -- +урон за зону
+Config.MonsterAttackRange = 14     -- дистанция удара
+Config.MonsterAttackCooldown = 1.2 -- сек между ударами
+Config.MonsterLeash = 230          -- дальность погони от центра зоны
+
 -- Мутации пчёл (шанс при рождении) -------------------------------------------
 Config.Mutations = {
 	{ Id = "None",    Name = "",            Mult = 1,  Chance = 0.84 },
