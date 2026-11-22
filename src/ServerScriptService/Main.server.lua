@@ -33,6 +33,8 @@ local Remotes = {
 	WorkBegin    = remoteEvent("WorkBegin"),    -- сервер -> клиент: начать обработку (stone)
 	WorkStage    = remoteEvent("WorkStage"),    -- сервер -> клиент: (stone, stage) 0=стоп/аборт
 	WorkTick     = remoteEvent("WorkTick"),     -- клиент -> сервер: (stone, dt)
+	WorkAbort    = remoteEvent("WorkAbort"),    -- клиент -> сервер: (stone) выйти из мини-игры
+	TeleportHome = remoteEvent("TeleportHome"), -- клиент -> сервер: телепорт на свою базу
 	OpenShop     = remoteEvent("OpenShop"),     -- сервер -> клиент: открыть магазин
 	BuyShopItem  = remoteEvent("BuyShopItem"),  -- клиент -> сервер: (itemId)
 	Folder       = remotes,

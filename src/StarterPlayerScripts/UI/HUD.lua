@@ -271,6 +271,24 @@ function HUD.Init(c)
 		togglePanel()
 	end)
 
+	-- кнопка телепорта на базу
+	local tpBtn = Instance.new("TextButton")
+	tpBtn.Size = UDim2.new(0, 130, 0, 44)
+	tpBtn.Position = UDim2.new(1, -142, 0, 62)
+	tpBtn.BackgroundColor3 = Color3.fromRGB(90, 180, 120)
+	tpBtn.Text = "🏠 ДОМОЙ"
+	tpBtn.Font = Enum.Font.FredokaOne
+	tpBtn.TextSize = 19
+	tpBtn.TextColor3 = Color3.new(1, 1, 1)
+	tpBtn.Parent = screen
+	local tbc = Instance.new("UICorner")
+	tbc.CornerRadius = UDim.new(0, 10)
+	tbc.Parent = tpBtn
+	tpBtn.MouseButton1Click:Connect(function()
+		local remotes = ReplicatedStorage:WaitForChild("LunarRemotes")
+		remotes.TeleportHome:FireServer()
+	end)
+
 	-- панель
 	local panel = Instance.new("Frame")
 	panel.Size = UDim2.new(0, 440, 0, 420)

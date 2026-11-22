@@ -19,6 +19,7 @@ end
 type Stone = {
 	Part: BasePart,
 	Dirt: BasePart?,
+	Prompt: ProximityPrompt?,
 	Stage: number, -- 0=едет, 1=ждёт очистки, 2=ждёт опиливания, 3=готов
 	Paused: boolean,
 	WaitT: number,
@@ -87,7 +88,7 @@ local function buildPlot(index: number, center: Vector3): BaseState
 		Size = Vector3.new(S, 1, S),
 		CFrame = CFrame.new(center + Vector3.new(0, 0.5, 0)),
 		Color = Color3.fromRGB(96, 98, 108),
-		Material = Enum.Material.Concrete,
+		Material = Enum.Material.Pavement,
 		Name = "Pad",
 	})
 	local frameC = Color3.fromRGB(90, 160, 255)
@@ -187,7 +188,7 @@ local function buildConveyor(st: BaseState, convIndex: number)
 		Size = Vector3.new(3, 0.5, L),
 		CFrame = CFrame.new(c.X + xOff, 2, zMid),
 		Color = Color3.fromRGB(45, 48, 55),
-		Material = Enum.Material.Metal,
+		Material = Enum.Material.DiamondPlate,
 		Name = "Belt",
 	})
 	for _, sx in ipairs({ -1.9, 1.9 }) do
@@ -195,7 +196,7 @@ local function buildConveyor(st: BaseState, convIndex: number)
 			Size = Vector3.new(0.5, 1.2, L),
 			CFrame = CFrame.new(c.X + xOff + sx, 2.4, zMid),
 			Color = Color3.fromRGB(150, 155, 165),
-			Material = Enum.Material.Metal,
+			Material = Enum.Material.DiamondPlate,
 		})
 	end
 	for i = 0, 4 do
@@ -304,7 +305,7 @@ local function buildTerminal(st: BaseState)
 		Size = Vector3.new(4, 3, 2),
 		CFrame = CFrame.new(c.X + 34, 2.5, c.Z + 2),
 		Color = Color3.fromRGB(50, 54, 66),
-		Material = Enum.Material.Metal,
+		Material = Enum.Material.DiamondPlate,
 	})
 	local screen = B.Part(m, {
 		Size = Vector3.new(3.4, 2, 0.3),
@@ -384,9 +385,20 @@ local function spawnStone(st: BaseState, conv: Conveyor)
 	})
 	dirt.CanQuery = false -- мышь и клики проходят сквозь грязь к камню
 
+	-- промпт обработки (E) — включается, когда камень остановился
+	local pp = Instance.new("ProximityPrompt")
+	pp.ActionText = "Обработать"
+	pp.ObjectText = "Лунный камень"
+	pp.HoldDuration = 0
+	pp.MaxActivationDistance = ctx.Config.WorkDistance
+	pp.RequiresLineOfSight = false
+	pp.Enabled = false
+	pp.Parent = part
+
 	local stone: Stone = {
 		Part = part,
 		Dirt = dirt,
+		Prompt = pp,
 		Stage = 0,
 		Paused = false,
 		WaitT = 0,
@@ -396,11 +408,7 @@ local function spawnStone(st: BaseState, conv: Conveyor)
 		OrigSize = part.Size,
 	}
 
-	-- клик по камню = начать обработку
-	local cd = Instance.new("ClickDetector")
-	cd.MaxActivationDistance = ctx.Config.WorkDistance
-	cd.Parent = part
-	cd.MouseClick:Connect(function(player)
+	pp.Triggered:Connect(function(player)
 		BaseService.TryStartWork(st, stone, player)
 	end)
 
@@ -410,6 +418,10 @@ end
 function BaseService.TryStartWork(st: BaseState, stone: Stone, player: Player)
 	if st.Owner ~= player then return end
 	if not stone.Paused or stone.Stage < 1 or stone.Stage > 2 then return end
+	if stone.WorkerBusy then
+		notify(player, "Робот уже обрабатывает этот камень", "info")
+		return
+	end
 	if stone.ClaimedBy and stone.ClaimedBy ~= player then return end
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -474,6 +486,9 @@ function BaseService.CompleteStage(st: BaseState, stone: Stone, player: Player?)
 		stone.Paused = false
 		stone.ClaimedBy = nil
 		stone.WorkerBusy = false
+		if stone.Prompt then
+			stone.Prompt.Enabled = false
+		end
 		stone.Part.Material = Enum.Material.SmoothPlastic
 		stone.Part.Color = Color3.fromRGB(140, 220, 255)
 		stone.Part.Size = stone.OrigSize * 0.8
@@ -1048,6 +1063,9 @@ local function productionLoop()
 						if stone.WaitT >= ctx.Config.StoneWaitTimeout and not stone.ClaimedBy and not stone.WorkerBusy then
 							-- устал ждать: едет дальше сырым
 							stone.Paused = false
+							if stone.Prompt then
+								stone.Prompt.Enabled = false
+							end
 						end
 					else
 						local myZ = stone.Part.Position.Z
@@ -1070,6 +1088,9 @@ local function productionLoop()
 								stone.Paused = true
 								stone.Stage = 1
 								stone.WaitT = 0
+								if stone.Prompt then
+									stone.Prompt.Enabled = true
+								end
 								stone.Part.CFrame = CFrame.new(stone.Part.Position.X, 3, conv.WorkZ) * (stone.Part.CFrame - stone.Part.CFrame.Position)
 								if stone.Dirt then
 									stone.Dirt.CFrame = stone.Part.CFrame
@@ -1275,9 +1296,35 @@ end
 
 -- ============================ ЖИЗНЕННЫЙ ЦИКЛ ============================
 
+local function onWorkAbort(player: Player, stonePart: BasePart)
+	local st = playerBase[player]
+	if not st then return end
+	for _, conv in ipairs(st.Conveyors) do
+		for _, stone in ipairs(conv.Stones) do
+			if stone.Part == stonePart and stone.ClaimedBy == player then
+				stone.ClaimedBy = nil
+				stone.Progress = 0
+				return
+			end
+		end
+	end
+end
+
+local function onTeleportHome(player: Player)
+	local st = playerBase[player]
+	if not st then return end
+	local spawn = st.Folder:FindFirstChild("Spawn")
+	local char = player.Character
+	if spawn and char then
+		char:PivotTo(spawn.CFrame + Vector3.new(0, 3, 0))
+	end
+end
+
 function BaseService.Init(c)
 	ctx = c
 	ctx.Remotes.WorkTick.OnServerEvent:Connect(onWorkTick)
+	ctx.Remotes.WorkAbort.OnServerEvent:Connect(onWorkAbort)
+	ctx.Remotes.TeleportHome.OnServerEvent:Connect(onTeleportHome)
 	ctx.Remotes.BuyShopItem.OnServerEvent:Connect(onBuyShopItem)
 end
 
