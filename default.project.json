@@ -1,0 +1,63 @@
+{
+  "name": "BuzzBlocks",
+  "globIgnorePaths": ["**/.DS_Store", "**/*.md"],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$path": "src/ReplicatedStorage"
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$path": "src/ServerScriptService"
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/StarterPlayerScripts"
+      },
+      "$properties": {
+        "CameraMaxZoomDistance": 120,
+        "CameraMinZoomDistance": 8,
+        "CharacterUseJumpPower": true,
+        "CharacterJumpPower": 55,
+        "CharacterWalkSpeed": 20
+      }
+    },
+
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "Gravity": 120,
+        "StreamingEnabled": false
+      }
+    },
+
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Ambient": [0.27, 0.27, 0.31],
+        "OutdoorAmbient": [0.35, 0.37, 0.41],
+        "Brightness": 2,
+        "ClockTime": 14,
+        "GeographicLatitude": 35,
+        "FogEnd": 1500,
+        "FogStart": 400,
+        "FogColor": [0.67, 0.82, 0.9],
+        "GlobalShadows": true,
+        "Technology": "Future"
+      }
+    },
+
+    "SoundService": {
+      "$className": "SoundService",
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}
